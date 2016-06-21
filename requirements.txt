@@ -1,0 +1,4 @@
+aiorchestra==0.1
+python-novaclient
+python-neutronclient
+python-heatclient

@@ -207,7 +207,8 @@ node_types:
           node: tosca.openstack.access_and_security.ssh_keypair
           relationship: tosca.openstack.access_and_security.ssh_keypair_connected_to_compute
     interfaces:
-      cloudify.interfaces.lifecycle:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
         create:
           implementation: openstack_plugin.orchestration.compute:create
           inputs:

@@ -46,7 +46,7 @@ async def eject(source, target, inputs):
     source.context.logger.info(
         "[{0} --X--> {1}] - Breaking relationship."
         .format(target.name, source.name))
-    source.context.logger.info('Injecting attributes to node "{0}".'
+    source.context.logger.info('Ejecting attributes from node "{0}".'
                                .format(source.name))
     for rAttr in [AUTH_PROPERTIES, TOKEN]:
         if rAttr in source.runtime_properties:

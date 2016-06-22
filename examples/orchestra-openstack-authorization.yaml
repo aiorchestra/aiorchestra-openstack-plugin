@@ -1,6 +1,6 @@
 tosca_definitions_version: tosca_simple_yaml_1_0
 
-description: Attempts to authorize to OpenStack
+description: Attempts to create compute resource
 
 
 #####################################################################
@@ -9,7 +9,8 @@ description: Attempts to authorize to OpenStack
 
 imports:
 
-  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/master/types.yaml
+  - ../types.yaml
+#  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/master/types.yaml
 
 topology_template:
 #####################################################################

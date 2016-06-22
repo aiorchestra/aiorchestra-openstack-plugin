@@ -12,6 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from glanceclient.v2 import client as glanceclient
+
 from keystoneauth1 import loading
 from keystoneauth1 import session
 from keystoneclient import client as keystoneclient
@@ -24,6 +26,7 @@ class OpenStackClients(object):
     __keystone = None
     __nova = None
     __neutron = None
+    __glance = None
 
     def keystone(self, node):
         if self.__keystone is None:
@@ -48,10 +51,21 @@ class OpenStackClients(object):
 
     def neutron(self, node):
         if self.__neutron is None:
-            creds = node.properties['auth_properties']
+            creds = node.runtime_properties['auth_properties']
             if 'region_name' in creds:
                 del creds['region_name']
             self.__neutron = neutronclient.Client(**creds)
         return self.__neutron
+
+    def glance(self, node):
+        if self.__glance is None:
+            creds = node.runtime_properties['auth_properties']
+            if 'region_name' in creds:
+                del creds['region_name']
+            loader = loading.get_plugin_loader('password')
+            auth = loader.load_from_options(**creds)
+            sess = session.Session(auth=auth)
+            self.__glance = glanceclient.Client(session=sess)
+        return self.__glance
 
 openstack = OpenStackClients()

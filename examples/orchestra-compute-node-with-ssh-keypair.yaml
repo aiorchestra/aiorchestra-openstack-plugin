@@ -1,6 +1,6 @@
 tosca_definitions_version: tosca_simple_yaml_1_0
 
-description: Attempts to create SSH keypair
+description: Attempts to authorize to OpenStack
 
 
 #####################################################################
@@ -21,21 +21,42 @@ topology_template:
 
     keystone_username:
       type: string
+      default: ''
 
     keystone_password:
       type: string
+      default: ''
 
     keystone_project_name:
       type: string
+      default: ''
 
     keystone_url:
       type: string
+      default: ''
 
     openstack_region:
       type: string
+      default: ''
 
-    ssh_keypair_name:
+    compute_keypair_name:
       type: string
+
+    compute_name:
+      type: string
+      default: 'compute-vm'
+
+    compute_image:
+      type: string
+      default: '6c3047c6-17b1-4aaf-a657-9229bb481e50'
+
+    compute_flavor:
+      type: string
+      default: '196235bc-7ca5-4085-ac81-7e0242bda3f9'
+
+    node_pool_size:
+      type: int
+      default: 1
 
 #####################################################################
 # Node templates
@@ -55,25 +76,27 @@ topology_template:
     orchestra_keypair:
       type: tosca.openstack.access_and_security.ssh_keypair
       properties:
-        name: { get_input: ssh_keypair_name }
+        name: { get_input: compute_keypair_name }
       requirements:
         - authorization_form: authorization_form
 
-    proxy_to_orchestra_keypair:
-      type: tosca.openstack.access_and_security.ssh_keypair
+    orchestra_compute:
+      type: tosca.openstack.compute_instance
       properties:
-        name: { get_property: [orchestra_keypair, name] }
-        use_existing: true
+        name: { get_input: compute_name }
+        image: { get_input: compute_image }
+        flavor: { get_input: compute_flavor }
+        node_pool_size: { get_input: node_pool_size }
       requirements:
         - authorization_form: authorization_form
-      requirements:
-        - authorization_form: authorization_form
-        - proxy_to: orchestra_keypair
+        - ssh_keypair: orchestra_keypair
 
   outputs:
     auth_token:
-      value: { get_attribute: [ authorization_form, auth_token ] }
+      value: { get_attribute: [authorization_form, auth_token ] }
     ssh_pub:
       value: { get_attribute: [orchestra_keypair, public_key] }
     ssh_priv:
       value: { get_attribute: [orchestra_keypair, private_key_content] }
+    server:
+      value: { get_attribute: [orchestra_compute, server]}

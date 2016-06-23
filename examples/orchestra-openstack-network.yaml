@@ -34,7 +34,7 @@ topology_template:
     openstack_region:
       type: string
 
-    ssh_keypair_name:
+    network_name:
       type: string
 
 #####################################################################
@@ -52,28 +52,15 @@ topology_template:
         auth_url:  { get_input: keystone_url }
         region_name:  { get_input: openstack_region }
 
-    orchestra_keypair:
-      type: tosca.openstack.access_and_security.ssh_keypair
+    orchestra_network:
+      type: tosca.openstack.network
       properties:
-        name: { get_input: ssh_keypair_name }
+        name_or_id: { get_input: network_name }
       requirements:
         - authorization_form: authorization_form
-
-    proxy_to_orchestra_keypair:
-      type: tosca.openstack.access_and_security.ssh_keypair
-      properties:
-        name: { get_property: [orchestra_keypair, name] }
-        use_existing: true
-      requirements:
-        - authorization_form: authorization_form
-      requirements:
-        - authorization_form: authorization_form
-        - proxy_to: orchestra_keypair
 
   outputs:
     auth_token:
       value: { get_attribute: [ authorization_form, auth_token ] }
-    ssh_pub:
-      value: { get_attribute: [orchestra_keypair, public_key] }
-    ssh_priv:
-      value: { get_attribute: [orchestra_keypair, private_key_content] }
+    network_id:
+      value: { get_attribute: [orchestra_network, id] }

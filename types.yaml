@@ -147,6 +147,10 @@ node_types:
           capability: tosca.capabilities.Node
           node: tosca.openstack.authorization_form
           relationship: tosca.openstack.access_and_security.inject_auth_properties
+      - proxy_to:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.access_and_security.ssh_keypair
+          relationship: tosca.openstack.proxy
     interfaces:
       Standard:
         type: tosca.interfaces.node.lifecycle.Standard
@@ -162,11 +166,19 @@ node_types:
   tosca.openstack.compute_instance:
     derived_from: tosca.openstack.node
     properties:
+      use_connection_pool:
+        type: boolean
+        default: false
+      compute_api_version:
+        type: string
+        default: '2'
+        constraints:
+          - valid_values: ['2']
       use_existing:
         type: boolean
         default: false
         required: false
-      name:
+      name_or_id:
         type: string
         required: true
       image:
@@ -175,13 +187,10 @@ node_types:
       flavor:
         type: string
         required: true
-      management_network_name:
-        type: string
-        required: true
       availability_zone:
         type: string
         required: false
-      node_pull_size:
+      node_pool_size:
         type: int
         default: 1
         required: false
@@ -193,6 +202,8 @@ node_types:
         default: true
         required: false
     attributes:
+      id:
+        type: string
       server:
         type: map
       status:
@@ -206,30 +217,142 @@ node_types:
           capability: tosca.capabilities.Node
           node: tosca.openstack.access_and_security.ssh_keypair
           relationship: tosca.openstack.access_and_security.ssh_keypair_connected_to_compute
+      - proxy_to:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.compute_instance
+          relationship: tosca.openstack.proxy
     interfaces:
       Standard:
         type: tosca.interfaces.node.lifecycle.Standard
         create:
           implementation: openstack_plugin.orchestration.compute:create
           inputs:
-            task_retries: 10
+            task_retries: 30
             task_retry_interval: 10
         start:
           implementation: openstack_plugin.orchestration.compute:start
           inputs:
-            task_retries: 10
+            task_retries: 30
             task_retry_interval: 10
         stop:
           implementation: openstack_plugin.orchestration.compute:stop
           inputs:
-            task_retries: 10
+            task_retries: 30
             task_retry_interval: 10
         delete:
           implementation: openstack_plugin.orchestration.compute:delete
           inputs:
+            task_retries: 30
+            task_retry_interval: 10
+
+
+##################################################################################################
+# OpenStack Network
+##################################################################################################
+
+  tosca.openstack.network:
+    derived_from: tosca.openstack.node
+    properties:
+      use_existing:
+        type: boolean
+        default: false
+      name_or_id:
+        type: stirng
+        default: ''
+    attributes:
+      id:
+        type: string
+    requirements:
+      - authorization_form:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.authorization_form
+          relationship: tosca.openstack.access_and_security.inject_auth_properties
+      - proxy_to:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.network
+          relationship: tosca.openstack.proxy
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.orchestration.network:network_create
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+        delete:
+          implementation: openstack_plugin.orchestration.network:network_delete
+          inputs:
             task_retries: 10
             task_retry_interval: 10
 
+##################################################################################################
+# OpenStack Network Subnet
+##################################################################################################
+
+  tosca.openstack.subnet:
+    derived_from: tosca.openstack.node
+    properties:
+      use_existing:
+        type: boolean
+        default: false
+      name_or_id:
+        type: string
+        required: true
+      ip_version:
+        type: int
+        default: 4
+        required: true
+      cidr:
+        type: string
+      allocation_pools:
+        type: list
+      dns_nameservers:
+        type: list
+    attributes:
+      id:
+        type: string
+      name:
+        type: string
+      network_id:
+        type: string
+      allocation_pools:
+        type: list
+      gateway_ip:
+        type: string
+      ip_version:
+        type: string
+      cidr:
+        type: string
+      enable_dhcp:
+        type: boolean
+      dns_nameservers:
+        type: list
+    requirements:
+      - authorization_form:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.authorization_form
+          relationship: tosca.openstack.access_and_security.inject_auth_properties
+      - network:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.network
+          relationship: tosca.openstack.networking.subnet_attached_to_network
+      - proxy_to:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.subnet
+          relationship: tosca.openstack.proxy
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.orchestration.network:subnet_create
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+        delete:
+          implementation: openstack_plugin.orchestration.network:subnet_delete
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
 
 ##################################################################################################
 # OpenStack Heat stack
@@ -280,17 +403,31 @@ node_types:
 # OpenStack relationships
 ##################################################################################################
 
+  tosca.openstack.networking.subnet_attached_to_network:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:link_subnet
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.network:unlink_subnet
+          inputs:
+            type: map
+
   tosca.openstack.access_and_security.ssh_keypair_connected_to_compute:
     derived_from: tosca.openstack.relationships.node
     interfaces:
       Configure:
         type: tosca.interfaces.relationship.Configure
         link:
-          implementation: openstack_plugin.access_and_security.ssh:link_to_compute
+          implementation: openstack_plugin.access_and_security.ssh:link
           inputs:
             type: map
         unlink:
-          implementation: openstack_plugin.access_and_security.ssh:unlink_to_compute
+          implementation: openstack_plugin.access_and_security.ssh:unlink
           inputs:
             type: map
 
@@ -305,5 +442,19 @@ node_types:
             type: map
         unlink:
           implementation: openstack_plugin.access_and_security.authorization:eject
+          inputs:
+            type: map
+
+  tosca.openstack.proxy:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: aiorchestra.core.noop:link
+          inputs:
+            type: map
+        unlink:
+          implementation: aiorchestra.core.noop:link
           inputs:
             type: map

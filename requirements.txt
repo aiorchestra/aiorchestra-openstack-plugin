@@ -1,4 +1,5 @@
 aiorchestra==0.1
 python-novaclient
+python-glanceclient
 python-neutronclient
 python-heatclient

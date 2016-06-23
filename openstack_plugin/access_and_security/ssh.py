@@ -58,19 +58,18 @@ async def delete(node, inputs):
 
 
 @utils.operation
-async def link_to_compute(source, target, inputs):
+async def link(source, target, inputs):
     source.context.logger.info(
         "[{0} -----> {1}] - Establishing relationship."
         .format(target.name, source.name))
-    source.update_runtime_properties({
-        'ssh_keypair': target.runtime_properties
-    })
+    source.update_runtime_properties(
+        'ssh_keypair', target.runtime_properties)
 
 
 @utils.operation
-async def unlink_to_compute(source, target, inputs):
+async def unlink(source, target, inputs):
     source.context.logger.info(
         "[{0} --X--> {1}] - Breaking relationship."
         .format(target.name, source.name))
     if 'ssh_keypair' in source.runtime_properties:
-        del source.update_runtime_properties['ssh_keypair']
+        del source.runtime_properties['ssh_keypair']

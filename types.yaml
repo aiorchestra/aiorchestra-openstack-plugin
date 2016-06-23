@@ -178,7 +178,7 @@ node_types:
         type: boolean
         default: false
         required: false
-      name:
+      name_or_id:
         type: string
         required: true
       image:
@@ -202,6 +202,8 @@ node_types:
         default: true
         required: false
     attributes:
+      id:
+        type: string
       server:
         type: map
       status:
@@ -225,12 +227,12 @@ node_types:
         create:
           implementation: openstack_plugin.orchestration.compute:create
           inputs:
-            task_retries: 10
+            task_retries: 30
             task_retry_interval: 10
         start:
           implementation: openstack_plugin.orchestration.compute:start
           inputs:
-            task_retries: 10
+            task_retries: 30
             task_retry_interval: 10
         stop:
           implementation: openstack_plugin.orchestration.compute:stop
@@ -240,9 +242,48 @@ node_types:
         delete:
           implementation: openstack_plugin.orchestration.compute:delete
           inputs:
-            task_retries: 10
+            task_retries: 30
             task_retry_interval: 10
 
+
+##################################################################################################
+# OpenStack Network
+##################################################################################################
+
+  tosca.openstack.network:
+    derived_from: tosca.openstack.node
+    properties:
+      use_existing:
+        type: boolean
+        default: false
+      name_or_id:
+        type: stirng
+        default: ''
+    attributes:
+      id:
+        type: string
+    requirements:
+      - authorization_form:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.authorization_form
+          relationship: tosca.openstack.access_and_security.inject_auth_properties
+      - proxy_to:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.network
+          relationship: tosca.openstack.proxy
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.orchestration.network:create
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+        delete:
+          implementation: openstack_plugin.orchestration.network:delete
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
 
 ##################################################################################################
 # OpenStack Heat stack

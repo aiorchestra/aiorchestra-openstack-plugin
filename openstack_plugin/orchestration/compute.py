@@ -29,7 +29,7 @@ async def create(node, inputs):
                              'compute instance.'.format(node.name))
     nova = clients.openstack.nova(node)
     name, flavor, image = (
-        node.properties['name'],
+        node.properties['name_or_id'],
         node.properties['flavor'],
         node.properties['image'],
     )
@@ -62,9 +62,10 @@ async def create(node, inputs):
     else:
         node.context.logger.info('[{0}] - Using existing compute instance.'
                                  .format(node.name))
-        server = nova.servers.get(node.runtime_properties['server']['id'])
+        server = nova.servers.get(node.properties['name_or_id'])
 
     node.batch_update_runtime_properties(**{
+        'id': server.id,
         'server': server.__dict__,
         'status': server.status,
     })
@@ -99,14 +100,14 @@ async def start(node, inputs):
                           task_retries=task_retries,
                           task_retry_interval=task_retry_interval)
         node.update_runtime_properties('status', nova.servers.get(
-            node.runtime_properties['server']['id']).status)
+            node.runtime_properties['id']).status)
         _server = nova.servers.get(
-            node.runtime_properties['server']['id'])
+            node.runtime_properties['id'])
         node.update_runtime_properties('server', _server.__dict__)
         node.context.logger.info('[{0}] - Compute instance is active.'
                                  .format(node.name))
     else:
-        _server = nova.servers.get(node.runtime_properties['server']['id'])
+        _server = nova.servers.get(node.properties['name_or_id'])
         node.context.logger.info('[{0}] - Compute instance is {1}.'
                                  .format(node.name, _server.status))
 
@@ -120,7 +121,7 @@ async def delete(node, inputs):
     if not node.properties['use_existing']:
         nova = clients.openstack.nova(node)
         _server = nova.servers.get(
-            node.runtime_properties['server']['id'])
+            node.runtime_properties['id'])
         try:
             _server.delete()
         except Exception as ex:
@@ -132,7 +133,7 @@ async def delete(node, inputs):
         def is_gone():
             try:
                 nova.servers.get(
-                    node.runtime_properties['server']['id'])
+                    node.runtime_properties['id'])
                 return False
             except Exception as ex:
                 node.context.logger.debug(str(ex))
@@ -144,10 +145,10 @@ async def delete(node, inputs):
         node.context.logger.info('[{0}] - Compute instance deleted.'
                                  .format(node.name))
     else:
-        node.context.logger.info('[{0}] - Compute instance remains, '
+        node.context.logger.info('[{0}] - Compute instance remains as is, '
                                  'because it is external resource.'
                                  .format(node.name))
-    for attr in ['server', 'status']:
+    for attr in ['id', 'server', 'status']:
         if attr in node.runtime_properties:
             del node.runtime_properties[attr]
 
@@ -162,7 +163,7 @@ async def stop(node, inputs):
                                  'instance.'.format(node.name))
         try:
             _server = nova.servers.get(
-                node.runtime_properties['server']['id'])
+                node.runtime_properties['id'])
             _server.stop()
         except Exception as ex:
             node.context.logger.debug(str(ex))
@@ -171,7 +172,7 @@ async def stop(node, inputs):
             pass
 
         def wait_until_task_finished():
-            _server = nova.servers.get(node.runtime_properties['server']['id'])
+            _server = nova.servers.get(node.runtime_properties['id'])
             server_task_state = getattr(_server, 'OS-EXT-STS:task_state')
             return server_task_state is None
 

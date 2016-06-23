@@ -77,7 +77,7 @@ topology_template:
     orchestra_compute:
       type: tosca.openstack.compute_instance
       properties:
-        name: { get_input: compute_name }
+        name_or_id: { get_input: compute_name }
         image: { get_input: compute_image }
         flavor: { get_input: compute_flavor }
         node_pool_size: { get_input: node_pool_size }
@@ -88,7 +88,7 @@ topology_template:
       type: tosca.openstack.compute_instance
       properties:
         use_existing: true
-        name: { get_property: [orchestra_compute, name] }
+        name_or_id: { get_attribute: [orchestra_compute, id] }
         image: { get_input: compute_image }
         flavor: { get_input: compute_flavor }
         node_pool_size: { get_input: node_pool_size }
@@ -99,7 +99,5 @@ topology_template:
   outputs:
     auth_token:
       value: { get_attribute: [authorization_form, auth_token ] }
-    ssh_pub:
-      value: { get_attribute: [orchestra_keypair, public_key] }
-    ssh_priv:
-      value: { get_attribute: [orchestra_keypair, private_key_content] }
+    server:
+      value: { get_attribute: [orchestra_compute, server]}

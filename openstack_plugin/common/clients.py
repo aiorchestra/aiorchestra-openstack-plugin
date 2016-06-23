@@ -28,6 +28,15 @@ class OpenStackClients(object):
     __neutron = None
     __glance = None
 
+    def __password_session_setup(self, node):
+        creds = node.runtime_properties['auth_properties']
+        if 'region_name' in creds:
+            del creds['region_name']
+        loader = loading.get_plugin_loader('password')
+        auth = loader.load_from_options(**creds)
+        sess = session.Session(auth=auth)
+        return sess
+
     def keystone(self, node):
         if self.__keystone is None:
             self.__keystone = keystoneclient.Client(**node.properties)
@@ -36,36 +45,24 @@ class OpenStackClients(object):
 
     def nova(self, node):
         if self.__nova is None:
-            creds = node.runtime_properties['auth_properties']
-            if 'region_name' in creds:
-                del creds['region_name']
             version = node.properties['compute_api_version']
             use_connection_pool = node.properties['use_connection_pool']
-            loader = loading.get_plugin_loader('password')
-            auth = loader.load_from_options(**creds)
-            sess = session.Session(auth=auth)
             self.__nova = novaclient.Client(
-                version, session=sess,
+                version, session=self.__password_session_setup(node),
                 connection_pool=use_connection_pool)
         return self.__nova
 
     def neutron(self, node):
         if self.__neutron is None:
-            creds = node.runtime_properties['auth_properties']
-            if 'region_name' in creds:
-                del creds['region_name']
-            self.__neutron = neutronclient.Client(**creds)
+            self.__neutron = neutronclient.Client(
+                session=self.__password_session_setup(node))
         return self.__neutron
 
     def glance(self, node):
         if self.__glance is None:
-            creds = node.runtime_properties['auth_properties']
-            if 'region_name' in creds:
-                del creds['region_name']
-            loader = loading.get_plugin_loader('password')
-            auth = loader.load_from_options(**creds)
-            sess = session.Session(auth=auth)
-            self.__glance = glanceclient.Client(session=sess)
+            self.__glance = glanceclient.Client(
+                session=self.__password_session_setup(node))
         return self.__glance
+
 
 openstack = OpenStackClients()

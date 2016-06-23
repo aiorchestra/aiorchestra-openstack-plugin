@@ -275,12 +275,81 @@ node_types:
       Standard:
         type: tosca.interfaces.node.lifecycle.Standard
         create:
-          implementation: openstack_plugin.orchestration.network:create
+          implementation: openstack_plugin.orchestration.network:network_create
           inputs:
             task_retries: 10
             task_retry_interval: 10
         delete:
-          implementation: openstack_plugin.orchestration.network:delete
+          implementation: openstack_plugin.orchestration.network:network_delete
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+
+##################################################################################################
+# OpenStack Network Subnet
+##################################################################################################
+
+  tosca.openstack.subnet:
+    derived_from: tosca.openstack.node
+    properties:
+      use_existing:
+        type: boolean
+        default: false
+      name_or_id:
+        type: string
+        required: true
+      ip_version:
+        type: int
+        default: 4
+        required: true
+      cidr:
+        type: string
+      allocation_pools:
+        type: list
+      dns_nameservers:
+        type: list
+    attributes:
+      id:
+        type: string
+      name:
+        type: string
+      network_id:
+        type: string
+      allocation_pools:
+        type: list
+      gateway_ip:
+        type: string
+      ip_version:
+        type: string
+      cidr:
+        type: string
+      enable_dhcp:
+        type: boolean
+      dns_nameservers:
+        type: list
+    requirements:
+      - authorization_form:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.authorization_form
+          relationship: tosca.openstack.access_and_security.inject_auth_properties
+      - network:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.network
+          relationship: tosca.openstack.networking.subnet_attached_to_network
+      - proxy_to:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.subnet
+          relationship: tosca.openstack.proxy
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.orchestration.network:subnet_create
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+        delete:
+          implementation: openstack_plugin.orchestration.network:subnet_delete
           inputs:
             task_retries: 10
             task_retry_interval: 10
@@ -333,6 +402,20 @@ node_types:
 ##################################################################################################
 # OpenStack relationships
 ##################################################################################################
+
+  tosca.openstack.networking.subnet_attached_to_network:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:link_subnet
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.network:unlink_subnet
+          inputs:
+            type: map
 
   tosca.openstack.access_and_security.ssh_keypair_connected_to_compute:
     derived_from: tosca.openstack.relationships.node

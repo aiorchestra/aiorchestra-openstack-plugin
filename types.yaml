@@ -259,6 +259,10 @@ node_types:
       name_or_id:
         type: stirng
         default: ''
+      is_external:
+        type: boolean
+        default: false
+        required: false
     attributes:
       id:
         type: string
@@ -336,6 +340,10 @@ node_types:
           capability: tosca.capabilities.Node
           node: tosca.openstack.network
           relationship: tosca.openstack.networking.subnet_attached_to_network
+      - router:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.router
+          relationship: tosca.openstack.networking.connect_subnet_to_router
       - proxy_to:
           capability: tosca.capabilities.Node
           node: tosca.openstack.subnet
@@ -353,6 +361,119 @@ node_types:
           inputs:
             task_retries: 10
             task_retry_interval: 10
+
+##################################################################################################
+# OpenStack Network Subnet Port
+##################################################################################################
+
+  tosca.openstack.subnet_port:
+    derived_from: tosca.openstack.node
+    properties:
+      use_existing:
+        type: boolean
+        default: false
+      name_or_id:
+        type: string
+        required: true
+    attributes:
+      id:
+        type: string
+      name:
+        type: string
+      network_id:
+        type: string
+      ip_address:
+        type: string
+      subnet_id:
+        type: string
+      mac_address:
+        type: string
+      status:
+        type: string
+      admit_state:
+        type: string
+      device_owner:
+        type: string
+    requirements:
+      - authorization_form:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.authorization_form
+          relationship: tosca.openstack.access_and_security.inject_auth_properties
+      - subnet:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.subnet
+          relationship: tosca.openstack.networking.port_attached_to_subnet
+      - proxy_to:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.subnet_port
+          relationship: tosca.openstack.proxy
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.orchestration.network:port_create
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+        delete:
+          implementation: openstack_plugin.orchestration.network:port_delete
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+
+##################################################################################################
+# OpenStack Network Subnet Port
+##################################################################################################
+
+  tosca.openstack.router:
+    derived_from: tosca.openstack.node
+    properties:
+      use_existing:
+        type: boolean
+        default: False
+        required: False
+      name_or_id:
+        type: string
+        required: True
+    attributes:
+      name:
+        type: string
+      id:
+        type: string
+      admin_state_up:
+        type: boolean
+      external_gateway_info:
+        type: map
+      routes:
+        type: list
+      status:
+        type: string
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.orchestration.network:router_create
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+        delete:
+          implementation: openstack_plugin.orchestration.network:router_delete
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+    requirements:
+      - authorization_form:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.authorization_form
+          relationship: tosca.openstack.access_and_security.inject_auth_properties
+      - external_network:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.network
+          relationship: tosca.openstack.networking.router_connected_to_external_network
+      - proxy_to:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.subnet_port
+          relationship: tosca.openstack.proxy
 
 ##################################################################################################
 # OpenStack Heat stack
@@ -402,6 +523,62 @@ node_types:
 ##################################################################################################
 # OpenStack relationships
 ##################################################################################################
+
+  tosca.openstack.networking.router_connected_to_external_network:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:link_router_to_external_network
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.network:unlink_router_from_external_network
+          inputs:
+            type: map
+
+  tosca.openstack.networking.connect_subnet_to_router:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:link_subnet_to_router
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.network:unlink_subnet_to_router
+          inputs:
+            type: map
+
+  tosca.openstack.networking.connect_ports_to_device:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.compute:link_port
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.compute:unlink_port
+          inputs:
+            type: map
+
+  tosca.openstack.networking.port_attached_to_subnet:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:link_port
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.network:unlink_port
+          inputs:
+            type: map
 
   tosca.openstack.networking.subnet_attached_to_network:
     derived_from: tosca.openstack.relationships.node

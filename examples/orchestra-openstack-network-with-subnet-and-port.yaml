@@ -34,8 +34,12 @@ topology_template:
     openstack_region:
       type: string
 
+    # network
+
     network_name:
       type: string
+
+    # subnet
 
     subnet_name:
       type: string
@@ -51,6 +55,11 @@ topology_template:
 
     subnet_dns_nameservers:
       type: list
+
+    # port
+
+    subnet_port:
+      type: string
 
 #####################################################################
 # Node templates
@@ -86,6 +95,14 @@ topology_template:
         - authorization_form: authorization_form
         - network: orchestra_network
 
+    orchestra_subnet_port:
+      type: tosca.openstack.subnet_port
+      properties:
+        name_or_id:  { get_input: subnet_port }
+      requirements:
+        - authorization_form: authorization_form
+        - subnet: orchestra_network_subnet
+
   outputs:
     auth_token:
       value: { get_attribute: [authorization_form, auth_token] }
@@ -93,3 +110,5 @@ topology_template:
       value: { get_attribute: [orchestra_network, id] }
     subnet_id:
       value: { get_attribute: [orchestra_network_subnet, id] }
+    subnet_port_id:
+      value: { get_attribute: [orchestra_subnet_port, id] }

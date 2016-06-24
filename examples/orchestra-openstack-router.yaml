@@ -34,23 +34,9 @@ topology_template:
     openstack_region:
       type: string
 
-    network_name:
+    router_name:
       type: string
 
-    subnet_name:
-      type: string
-
-    subnet_ip_version:
-      type: int
-
-    subnet_cidr:
-      type: string
-
-    subnet_pools:
-      type: list
-
-    subnet_dns_nameservers:
-      type: list
 
 #####################################################################
 # Node templates
@@ -67,29 +53,15 @@ topology_template:
         auth_url:  { get_input: keystone_url }
         region_name:  { get_input: openstack_region }
 
-    orchestra_network:
-      type: tosca.openstack.network
+    orchestra_router:
+      type: tosca.openstack.router
       properties:
-        name_or_id: { get_input: network_name }
+        name_or_id: { get_input: router_name }
       requirements:
         - authorization_form: authorization_form
-
-    orchestra_network_subnet:
-      type: tosca.openstack.subnet
-      properties:
-        name_or_id: { get_input: subnet_name }
-        ip_version: { get_input: subnet_ip_version }
-        cidr: { get_input: subnet_cidr }
-        allocation_pools: { get_input: subnet_pools }
-        dns_nameservers: { get_input: subnet_dns_nameservers }
-      requirements:
-        - authorization_form: authorization_form
-        - network: orchestra_network
 
   outputs:
     auth_token:
       value: { get_attribute: [authorization_form, auth_token] }
     network_id:
-      value: { get_attribute: [orchestra_network, id] }
-    subnet_id:
-      value: { get_attribute: [orchestra_network_subnet, id] }
+      value: { get_attribute: [orchestra_router, id] }

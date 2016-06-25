@@ -245,7 +245,6 @@ node_types:
             task_retries: 30
             task_retry_interval: 10
 
-
 ##################################################################################################
 # OpenStack Network
 ##################################################################################################
@@ -552,17 +551,17 @@ node_types:
           inputs:
             type: map
 
-  tosca.openstack.networking.connect_ports_to_device:
+  tosca.openstack.compute.connect_port_to_compute:
     derived_from: tosca.openstack.relationships.node
     interfaces:
       Configure:
         type: tosca.interfaces.relationship.Configure
         link:
-          implementation: openstack_plugin.orchestration.compute:link_port
+          implementation: openstack_plugin.orchestration.network:add_port
           inputs:
             type: map
         unlink:
-          implementation: openstack_plugin.orchestration.compute:unlink_port
+          implementation: openstack_plugin.orchestration.network:remove_port
           inputs:
             type: map
 

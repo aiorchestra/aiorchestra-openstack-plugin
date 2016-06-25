@@ -49,11 +49,15 @@ async def create(node, inputs):
 
         try:
             ssh_key = None
+            nics = None
             if 'ssh_keypair' in node.runtime_properties:
                 ssh_key = node.runtime_properties['ssh_keypair']['name']
+            if 'nics' in node.runtime_properties:
+                nics = node.runtime_properties['nics']
 
             server = nova.servers.create(name, image, flavor,
-                                         key_name=ssh_key)
+                                         key_name=ssh_key,
+                                         nics=nics)
             node.context.logger.info("[{0}] - Compute instance created."
                                      .format(node.name))
         except Exception as ex:
@@ -77,7 +81,7 @@ async def start(node, inputs):
     task_retry_interval = inputs.get('task_retry_interval', 10)
     nova = clients.openstack.nova(node)
     if not node.properties['use_existing']:
-        def wait_until_active():
+        async def wait_until_active():
             _server = nova.servers.get(node.runtime_properties['server']['id'])
             server_task_state = getattr(_server, 'OS-EXT-STS:task_state')
             if _server.status == COMPUTE_ACTIVE:
@@ -130,7 +134,7 @@ async def delete(node, inputs):
             # next operation will delete it
             pass
 
-        def is_gone():
+        async def is_gone():
             try:
                 nova.servers.get(
                     node.runtime_properties['id'])
@@ -171,7 +175,7 @@ async def stop(node, inputs):
             # next operation will delete it
             pass
 
-        def wait_until_task_finished():
+        async def wait_until_task_finished():
             _server = nova.servers.get(node.runtime_properties['id'])
             server_task_state = getattr(_server, 'OS-EXT-STS:task_state')
             return server_task_state is None

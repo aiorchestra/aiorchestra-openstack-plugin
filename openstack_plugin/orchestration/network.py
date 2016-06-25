@@ -52,7 +52,7 @@ async def network_delete(node, inputs):
     if not node.properties['use_existing']:
         neutron.delete_network(node.attributes['id'])
 
-        def is_gone():
+        async def is_gone():
             try:
                 neutron.show_network(node.attributes['id'])
                 return False
@@ -149,7 +149,7 @@ async def subnet_delete(node, inputs):
             router_node.batch_update_runtime_properties(**router)
         neutron.delete_subnet(node.get_attribute('id'))
 
-        def is_gone():
+        async def is_gone():
             try:
                 neutron.show_subnet(node.get_attribute('id'))
                 return False
@@ -239,6 +239,9 @@ async def port_create(node, inputs):
             ip_and_subnet = port[k].pop()
             node.batch_update_runtime_properties(**ip_and_subnet)
     node.batch_update_runtime_properties(**port)
+    node.context.logger.info(
+        '[{0}] - Port created for subnet "{1}".'
+        .format(node.name, node.runtime_properties['subnet_id']))
 
 
 @utils.operation
@@ -250,17 +253,22 @@ async def port_delete(node, inputs):
         id = node.get_attribute('id')
         neutron.delete_port(id)
 
-    def is_gone():
-        try:
-            neutron.show_port(id)
-            return False
-        except Exception as ex:
-            node.context.logger.debug(str(ex))
-            return True
+        async def is_gone():
+            try:
+                neutron.show_port(id)
+                return False
+            except Exception as ex:
+                node.context.logger.debug(str(ex))
+                return True
 
-    await utils.retry(is_gone, exceptions=(Exception, ),
-                      task_retries=task_retries,
-                      task_retry_interval=task_retry_interval)
+        await utils.retry(is_gone, exceptions=(Exception, ),
+                          task_retries=task_retries,
+                          task_retry_interval=task_retry_interval)
+    else:
+        node.context.logger.info(
+            '[{0}] - Leaving port "{1}" as is, '
+            'because of it is external resource.'
+            .format(node.name, node.get_attribute('id')))
 
 
 @utils.operation
@@ -329,7 +337,7 @@ async def router_delete(node, inputs):
             .format(node.name, name_or_id))
         neutron.delete_router(node.get_attribute('id'))
 
-        def is_gone():
+        async def is_gone():
             try:
                 neutron.show_router(node.get_attribute('id'))
                 return False
@@ -373,3 +381,28 @@ async def link_router_to_external_network(source, target, inputs):
 async def unlink_router_from_external_network(source, target, inputs):
     if 'external_gateway_info' in source.runtime_properties:
         del source.runtime_properties['external_gateway_info']
+
+
+@utils.operation
+async def add_port(source, target, inputs):
+    nics = source.runtime_properties.get('nics', [])
+    port = {}
+    neutron = clients.openstack.neutron(target)
+    subnet = neutron.show_subnet(
+        target.runtime_properties['subnet_id'])['subnet']
+    ip_version = subnet['ip_version']
+
+    port.update({
+        'net-id': target.runtime_properties['network_id'],
+        'port-id': target.get_attribute('id'),
+        'v{0}-fixed-ip'.format(str(ip_version)):
+            target.get_attribute('ip_address')
+    })
+    nics.append(port)
+    source.update_runtime_properties('nics', nics)
+
+
+@utils.operation
+async def remove_port(source, target, inputs):
+    if 'nics' in source.runtime_properties:
+        del source.runtime_properties['nics']

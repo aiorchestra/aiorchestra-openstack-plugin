@@ -54,10 +54,6 @@ topology_template:
       type: string
       default: '196235bc-7ca5-4085-ac81-7e0242bda3f9'
 
-    node_pool_size:
-      type: int
-      default: 1
-
 #####################################################################
 # Node templates
 #####################################################################
@@ -86,7 +82,6 @@ topology_template:
         name_or_id: { get_input: compute_name }
         image: { get_input: compute_image }
         flavor: { get_input: compute_flavor }
-        node_pool_size: { get_input: node_pool_size }
       requirements:
         - authorization_form: authorization_form
         - ssh_keypair: orchestra_keypair

@@ -406,3 +406,88 @@ async def add_port(source, target, inputs):
 async def remove_port(source, target, inputs):
     if 'nics' in source.runtime_properties:
         del source.runtime_properties['nics']
+
+
+@utils.operation
+async def floatingip_create(node, inputs):
+    log = node.context.logger
+    if 'floating_network_id' not in node.runtime_properties:
+        raise Exception('[{0}] - Network required for floating '
+                        'IP provisioning.'.format(node.name))
+    floating_ip_dict = {
+        'floating_network_id': node.runtime_properties[
+            'floating_network_id']
+    }
+    log.info('[{0}] - Attempting to create floating IP.'
+             .format(node.name))
+    if 'port_id' in node.runtime_properties:
+        log.info('[{0}] - Attempting to create floating IP for port "{1}".'
+                 .format(node.name, node.runtime_properties['port_id']))
+        port = {'port_id': node.runtime_properties['port_id']}
+        floating_ip_dict.update(port)
+    neutron = clients.openstack.neutron(node)
+
+    fip = neutron.create_floatingip(body={
+        'floatingip': floating_ip_dict})['floatingip']
+
+    node.batch_update_runtime_properties(**fip)
+    log.info('[{0}] - Floating IP created.'
+             .format(node.name))
+
+
+@utils.operation
+async def floatingip_delete(node, inputs):
+    log = node.context.logger
+    log.info('[{0}] - Attempting to delete floating IP.'
+             .format(node.name))
+    fip = node.runtime_properties['id']
+    neutron = clients.openstack.neutron(node)
+    neutron.delete_floatingip(fip)
+    log.info('[{0}] - Floating IP deleted.'
+             .format(node.name))
+
+
+@utils.operation
+async def link_floatingip_to_network(source, target, inputs):
+    log = source.context.logger
+    network_id = target.get_attribute('id')
+    log.info('[{0} -----> {1}] - Connecting floating IP to '
+             'network "{2}".'.format(target.name,
+                                     source.name,
+                                     network_id))
+    source.update_runtime_properties(
+        'floating_network_id', network_id)
+
+
+@utils.operation
+async def unlink_floatingip_from_network(source, target, inputs):
+    if 'floating_network_id' in source.runtime_properties:
+        source.context.logger.info(
+            '[{0} --X--> {1}] - Disconnecting floating IP from '
+            'network "{2}".'.format(
+                    target.name,
+                    source.name,
+                    source.runtime_properties['floating_network_id']))
+        del source.runtime_properties['floating_network_id']
+
+
+@utils.operation
+async def link_floatingip_to_port(source, target, inputs):
+    log = source.context.logger
+    source.update_runtime_properties(
+        'port_id', target.get_attribute('id'))
+    log.info('[{0} -----> {1}] - Connecting floating IP to '
+             'port "{2}".'.format(target.name,
+                                  source.name,
+                                  target.get_attribute('id')))
+
+
+@utils.operation
+async def unlink_floatingip_from_port(source, target, inputs):
+    log = source.context.logger
+    if 'port_id' in source.runtime_properties:
+        log.info('[{0} --X--> {1}] - Disconnecting floating IP from '
+                 'port "{2}".'.format(target.name,
+                                      source.name,
+                                      target.get_attribute('id')))
+        del source.runtime_properties['port_id']

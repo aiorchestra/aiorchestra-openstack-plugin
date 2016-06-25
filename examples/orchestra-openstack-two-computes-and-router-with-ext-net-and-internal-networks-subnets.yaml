@@ -53,14 +53,6 @@ topology_template:
       type: string
       default: '196235bc-7ca5-4085-ac81-7e0242bda3f9'
 
-    compute_management_network_name:
-      type: string
-      default: 'external'
-
-    node_pool_size:
-      type: int
-      default: 1
-
     # network
 
     ext_net_name:
@@ -205,7 +197,6 @@ topology_template:
         name_or_id: { get_input: compute_name_one }
         image: { get_input: compute_image }
         flavor: { get_input: compute_flavor }
-        node_pool_size: { get_input: node_pool_size }
       requirements:
         - authorization_form: auth
         - port_1:
@@ -218,7 +209,6 @@ topology_template:
         name_or_id: { get_input: compute_name_two }
         image: { get_input: compute_image }
         flavor: { get_input: compute_flavor }
-        node_pool_size: { get_input: node_pool_size }
       requirements:
         - authorization_form: auth
         - port_2:

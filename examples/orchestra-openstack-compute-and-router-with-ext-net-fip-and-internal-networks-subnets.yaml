@@ -204,6 +204,20 @@ topology_template:
         - authorization_form: auth
         - subnet: orchestra_network_subnet_two
 
+    orchestra_floating_ip_one:
+      type: tosca.openstack.floating_ip
+      requirements:
+        - authorization_form: auth
+        - network: orchestra_external_network
+        - port: orchestra_subnet_port_one
+
+    orchestra_floating_ip_two:
+      type: tosca.openstack.floating_ip
+      requirements:
+        - authorization_form: auth
+        - network: orchestra_external_network
+        - port: orchestra_subnet_port_two
+
   outputs:
     auth_token:
       value: { get_attribute: [auth, auth_token] }

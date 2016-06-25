@@ -190,10 +190,6 @@ node_types:
       availability_zone:
         type: string
         required: false
-      node_pool_size:
-        type: int
-        default: 1
-        required: false
       user_data:
         type: string
         required: false
@@ -421,7 +417,7 @@ node_types:
             task_retry_interval: 10
 
 ##################################################################################################
-# OpenStack Network Subnet Port
+# OpenStack Router
 ##################################################################################################
 
   tosca.openstack.router:
@@ -475,53 +471,84 @@ node_types:
           relationship: tosca.openstack.proxy
 
 ##################################################################################################
-# OpenStack Heat stack
+# OpenStack Floating IP
 ##################################################################################################
 
-  tosca.openstack.orchestrator.stack:
+  tosca.openstack.floating_ip:
     derived_from: tosca.openstack.node
-    properties:
-      name:
-        type: string
-        required: true
-      template_path:
-        type: string
-        required: true
-      stack_parameters:
-        type: map
-        required: false
-      auth_properties:
-        type: map
-        required: true
     attributes:
-      stack:
-        type: map
-      outputs:
-        type: map
+      floating_network_id:
+        type: string
+      fixed_ip_address:
+        type: string
+      floating_ip_address:
+        type: string
+      id:
+        type: string
+      port_id:
+        type: string
+      router_id:
+        type: string
       status:
         type: string
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.orchestration.network:floatingip_create
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
+        delete:
+          implementation: openstack_plugin.orchestration.network:floatingip_delete
+          inputs:
+            task_retries: 10
+            task_retry_interval: 10
     requirements:
       - authorization_form:
           capability: tosca.capabilities.Node
           node: tosca.openstack.authorization_form
           relationship: tosca.openstack.access_and_security.inject_auth_properties
-    interfaces:
-      Standard:
-        type: tosca.interfaces.node.lifecycle.Standard
-        create:
-          implementation: openstack_plugin.orchestration.stacks:create
-          inputs:
-            task_retries: 10
-            task_retry_interval: 10
-        delete:
-          implementation: openstack_plugin.orchestration.stacks:delete
-          inputs:
-            task_retries: 10
-            task_retry_interval: 10
+      - network:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.network
+          relationship: tosca.openstack.networking.allocate_floatingip_from_network
+      - port:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.network
+          relationship: tosca.openstack.networking.floatingip_connected_to_port
 
 ##################################################################################################
 # OpenStack relationships
 ##################################################################################################
+
+  tosca.openstack.networking.allocate_floatingip_from_network:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:link_floatingip_to_network
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.network:unlink_floatingip_from_network
+          inputs:
+            type: map
+
+  tosca.openstack.networking.floatingip_connected_to_port:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:link_floatingip_to_port
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.network:unlink_floatingip_from_port
+          inputs:
+            type: map
 
   tosca.openstack.networking.router_connected_to_external_network:
     derived_from: tosca.openstack.relationships.node

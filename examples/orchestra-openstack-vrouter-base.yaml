@@ -12,7 +12,6 @@ imports:
   - ../types.yaml
 #  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/master/types.yaml
 
-
 topology_template:
 #####################################################################
 # Inputs
@@ -35,6 +34,69 @@ topology_template:
     openstack_region:
       type: string
 
+    # network
+
+    ext_net_name:
+      type: string
+
+    network_name_one:
+      type: string
+
+    network_name_two:
+      type: string
+
+    network_name_three:
+      type: string
+
+    # subnet
+
+    subnet_name_one:
+      type: string
+
+    subnet_name_two:
+      type: string
+
+    subnet_name_three:
+      type: string
+
+    subnet_ip_version:
+      type: int
+
+    subnet_cidr_one:
+      type: string
+
+    subnet_cidr_two:
+      type: string
+
+    subnet_cidr_three:
+      type: string
+
+    subnet_pools_one:
+      type: list
+
+    subnet_pools_two:
+      type: list
+
+    subnet_pools_three:
+      type: list
+
+    subnet_dns_nameservers:
+      type: list
+
+    subnet_port_one:
+      type: string
+
+    subnet_port_two:
+      type: string
+
+    subnet_port_three:
+      type: string
+
+    # router
+
+    router_name:
+      type: string
+
     # compute
 
     compute_name:
@@ -49,63 +111,13 @@ topology_template:
       type: string
       default: '196235bc-7ca5-4085-ac81-7e0242bda3f9'
 
-    # network
-
-    ext_net_name:
-      type: string
-
-    network_name_one:
-      type: string
-
-    network_name_two:
-      type: string
-
-    # subnet
-
-    subnet_name_one:
-      type: string
-
-    subnet_name_two:
-      type: string
-
-    subnet_ip_version:
-      type: int
-
-    subnet_cidr_one:
-      type: string
-
-    subnet_cidr_two:
-      type: string
-
-    subnet_pools_one:
-      type: list
-
-    subnet_pools_two:
-      type: list
-
-    subnet_dns_nameservers:
-      type: list
-
-    # router
-
-    router_name:
-      type: string
-
-    # ports
-
-    subnet_port_one:
-      type: string
-
-    subnet_port_two:
-      type: string
-
 #####################################################################
 # Node templates
 #####################################################################
 
   node_templates:
 
-    auth:
+    authorization_form:
       type: tosca.openstack.authorization_form
       properties:
         username: { get_input: keystone_username }
@@ -121,14 +133,14 @@ topology_template:
         name_or_id: { get_input: ext_net_name }
         is_external: true
       requirements:
-        - authorization_form: auth
+        - authorization_form: authorization_form
 
     orchestra_router:
       type: tosca.openstack.router
       properties:
         name_or_id: { get_input: router_name }
       requirements:
-        - authorization_form: auth
+        - authorization_form: authorization_form
         - external_network: orchestra_external_network
 
     orchestra_network_one:
@@ -136,14 +148,21 @@ topology_template:
       properties:
         name_or_id: { get_input: network_name_one }
       requirements:
-        - authorization_form: auth
+        - authorization_form: authorization_form
 
     orchestra_network_two:
       type: tosca.openstack.network
       properties:
         name_or_id: { get_input: network_name_two }
       requirements:
-        - authorization_form: auth
+        - authorization_form: authorization_form
+
+    orchestra_network_three:
+      type: tosca.openstack.network
+      properties:
+        name_or_id: { get_input: network_name_three }
+      requirements:
+        - authorization_form: authorization_form
 
     orchestra_network_subnet_one:
       type: tosca.openstack.subnet
@@ -154,9 +173,8 @@ topology_template:
         allocation_pools: { get_input: subnet_pools_one }
         dns_nameservers: { get_input: subnet_dns_nameservers }
       requirements:
-        - authorization_form: auth
+        - authorization_form: authorization_form
         - network: orchestra_network_one
-        - router: orchestra_router
 
     orchestra_network_subnet_two:
       type: tosca.openstack.subnet
@@ -167,33 +185,28 @@ topology_template:
         allocation_pools: { get_input: subnet_pools_two }
         dns_nameservers: { get_input: subnet_dns_nameservers }
       requirements:
-        - authorization_form: auth
+        - authorization_form: authorization_form
         - network: orchestra_network_two
-        - router: orchestra_router
 
-    orchestra_compute:
-      type: tosca.openstack.compute_instance
+    orchestra_network_subnet_three:
+      type: tosca.openstack.subnet
       properties:
-        name_or_id: { get_input: compute_name }
-        image: { get_input: compute_image }
-        flavor: { get_input: compute_flavor }
+        name_or_id: { get_input: subnet_name_three }
+        ip_version: { get_input: subnet_ip_version }
+        cidr: { get_input: subnet_cidr_three }
+        allocation_pools: { get_input: subnet_pools_three }
+        dns_nameservers: { get_input: subnet_dns_nameservers }
       requirements:
-        - authorization_form: auth
-        - port_1:
-            node: orchestra_subnet_port_one
-            capability: tosca.capabilities.Node
-            relationship: tosca.openstack.compute.connect_port_to_compute
-        - port_2:
-            node: orchestra_subnet_port_two
-            capability: tosca.capabilities.Node
-            relationship: tosca.openstack.compute.connect_port_to_compute
+        - authorization_form: authorization_form
+        - network: orchestra_network_three
+        - router: orchestra_router
 
     orchestra_subnet_port_one:
       type: tosca.openstack.subnet_port
       properties:
         name_or_id:  { get_input: subnet_port_one }
       requirements:
-        - authorization_form: auth
+        - authorization_form: authorization_form
         - subnet: orchestra_network_subnet_one
 
     orchestra_subnet_port_two:
@@ -201,12 +214,45 @@ topology_template:
       properties:
         name_or_id:  { get_input: subnet_port_two }
       requirements:
-        - authorization_form: auth
+        - authorization_form: authorization_form
         - subnet: orchestra_network_subnet_two
+
+    orchestra_subnet_port_three:
+      type: tosca.openstack.subnet_port
+      properties:
+        name_or_id:  { get_input: subnet_port_three }
+      requirements:
+        - authorization_form: authorization_form
+        - subnet: orchestra_network_subnet_three
+
+    orchestra_floating_ip:
+      type: tosca.openstack.floating_ip
+      requirements:
+        - authorization_form: authorization_form
+        - network: orchestra_external_network
+        - port: orchestra_subnet_port_three
+
+    vrouter_host:
+      type: tosca.openstack.compute_instance
+      properties:
+        name_or_id: { get_input: compute_name }
+        image: { get_input: compute_image }
+        flavor: { get_input: compute_flavor }
+      requirements:
+        - authorization_form: authorization_form
+        - mgmt_port:
+            node: orchestra_subnet_port_three
+            relationship: tosca.openstack.compute.connect_port_to_compute
+        - inbound:
+            node: orchestra_subnet_port_one
+            relationship: tosca.openstack.compute.connect_port_to_compute
+        - outbound:
+            node: orchestra_subnet_port_two
+            relationship: tosca.openstack.compute.connect_port_to_compute
 
   outputs:
     auth_token:
-      value: { get_attribute: [auth, auth_token] }
+      value: { get_attribute: [authorization_form, auth_token] }
     router_id:
       value: { get_attribute: [orchestra_router, id] }
     network_one_id:

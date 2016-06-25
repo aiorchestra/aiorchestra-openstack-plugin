@@ -51,14 +51,6 @@ topology_template:
       type: string
       default: '196235bc-7ca5-4085-ac81-7e0242bda3f9'
 
-    compute_management_network_name:
-      type: string
-      default: 'external'
-
-    node_pool_size:
-      type: int
-      default: 1
-
 #####################################################################
 # Node templates
 #####################################################################
@@ -80,21 +72,8 @@ topology_template:
         name_or_id: { get_input: compute_name }
         image: { get_input: compute_image }
         flavor: { get_input: compute_flavor }
-        node_pool_size: { get_input: node_pool_size }
       requirements:
         - authorization_form: authorization_form
-
-    orchestra_compute_proxy:
-      type: tosca.openstack.compute_instance
-      properties:
-        use_existing: true
-        name_or_id: { get_attribute: [orchestra_compute, id] }
-        image: { get_input: compute_image }
-        flavor: { get_input: compute_flavor }
-        node_pool_size: { get_input: node_pool_size }
-      requirements:
-        - authorization_form: authorization_form
-        - proxy_to: orchestra_compute
 
   outputs:
     auth_token:

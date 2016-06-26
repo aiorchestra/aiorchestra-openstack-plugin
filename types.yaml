@@ -212,7 +212,7 @@ node_types:
       - ssh_keypair:
           capability: tosca.capabilities.Node
           node: tosca.openstack.access_and_security.ssh_keypair
-          relationship: tosca.openstack.access_and_security.ssh_keypair_connected_to_compute
+          relationship: tosca.openstack.access_and_security.ssh_keypair_provider
       - proxy_to:
           capability: tosca.capabilities.Node
           node: tosca.openstack.compute_instance
@@ -689,7 +689,7 @@ node_types:
           inputs:
             type: map
 
-  tosca.openstack.access_and_security.ssh_keypair_connected_to_compute:
+  tosca.openstack.access_and_security.ssh_keypair_provider:
     derived_from: tosca.openstack.relationships.node
     interfaces:
       Configure:
@@ -702,6 +702,16 @@ node_types:
           implementation: openstack_plugin.access_and_security.ssh:unlink
           inputs:
             type: map
+
+  tosca.openstack.access_and_security.floating_provider:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:inject_floating_ip_attributes
+        unlink:
+          implementation: openstack_plugin.orchestration.network:eject_floating_ip_attributes
 
   tosca.openstack.access_and_security.inject_auth_properties:
     derived_from: tosca.openstack.relationships.node

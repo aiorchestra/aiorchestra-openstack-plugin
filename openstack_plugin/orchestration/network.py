@@ -561,3 +561,18 @@ async def link_security_groups_to_port(source, target, inputs):
 async def unlink_security_groups_from_port(source, target, inputs):
     if 'security_groups' in source.runtime_properties:
         del source.runtime_properties['security_groups']
+
+
+@utils.operation
+async def inject_floating_ip_attributes(source, target, inputs):
+    fip = target.runtime_properties['floating_ip_address']
+    source.batch_update_runtime_properties(**{
+        'access_ip': fip,
+    })
+
+
+@utils.operation
+async def eject_floating_ip_attributes(source, target, inputs):
+    for attr in ['access_ip']:
+        if attr in source.runtime_properties:
+            del source.runtime_properties[attr]

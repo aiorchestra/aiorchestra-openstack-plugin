@@ -21,7 +21,7 @@ def read(fname):
 
 setuptools.setup(
     name='aiorchestra-openstack-plugin',
-    version='0.1',
+    version='0.1.1',
     description='AsyncIO TOSCA orchestrator OpenStack plugin',
     long_description=read('README.rst'),
     url='https://aiorchestra.io/',

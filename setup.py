@@ -29,7 +29,7 @@ setuptools.setup(
     author_email='lildee1991@gmail.com',
     packages=setuptools.find_packages(exclude=['openstack_plugin.tests', ]),
     install_requires=[
-        'aiorchestra==0.1',
+        'aiorchestra==0.1.1',
         'python-heatclient',
         'python-glanceclient',
         'python-novaclient',

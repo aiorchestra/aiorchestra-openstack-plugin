@@ -223,6 +223,11 @@ async def port_create(node, inputs):
 
             }
         }
+
+        if 'security_groups' in node.runtime_properties:
+            port_dict['port']['security_groups'] = (
+                node.runtime_properties['security_groups'])
+
         port = neutron.create_port(body=port_dict)['port']
         node.context.logger.info(
             '[{0}] - Port at subnet "{1}" of network "{2}".'
@@ -372,7 +377,7 @@ async def unlink_subnet_to_router(source, target, inputs):
 async def link_router_to_external_network(source, target, inputs):
     source.update_runtime_properties('external_gateway_info', {
         'external_gateway_info': {
-            'network_id': target.get_attribute('id')
+            'network_id': target.properties['name_or_id']
         }
     })
 
@@ -491,3 +496,68 @@ async def unlink_floatingip_from_port(source, target, inputs):
                                       source.name,
                                       target.get_attribute('id')))
         del source.runtime_properties['port_id']
+
+
+@utils.operation
+async def security_group_create(node, inputs):
+    log = node.context.logger
+    neutron = clients.openstack.neutron(node)
+    name_or_id = node.properties['name_or_id']
+    if not node.properties['use_existing']:
+        log.info('[{0}] - Attempting to create security group.'
+                 .format(node.name))
+        description = node.properties.get('description')
+        rules = node.properties.get('rules', [])
+        sg_dict = {
+            'description': description,
+            'name': name_or_id,
+        }
+        sg = neutron.create_security_group(
+            {'security_group': sg_dict})['security_group']
+        log.info('[{0}] - Security group created.'
+                 .format(node.name))
+        node.batch_update_runtime_properties(**sg)
+        for rule in rules:
+            rule.update(security_group_id=sg['id'])
+            log.info('[{0}] - Attempting to create rule for '
+                     'security group "{1}".'
+                     .format(node.name, sg['id']))
+
+            _r = neutron.create_security_group_rule(
+                {'security_group_rule': rule}
+            )['security_group_rule']
+
+            log.info('[{0}] - Security group rule create: "{1}".'
+                     .format(node.name, _r['id']))
+        sg = neutron.show_security_group(sg['id'])
+    else:
+        log.info('[{0}] - Using existing security group.'.format(node.name))
+        sg = neutron.show_security_group(name_or_id)['security_group']
+
+    node.batch_update_runtime_properties(**sg)
+
+
+@utils.operation
+async def security_group_delete(node, inputs):
+    log = node.context.logger
+    neutron = clients.openstack.neutron(node)
+    if not node.properties['use_existing']:
+        id = node.get_attribute('id')
+        neutron.delete_security_group(id)
+    else:
+        log.info('[{0}] - Security group remains as is, '
+                 'because it is an external resource'.format(node.name))
+
+
+@utils.operation
+async def link_security_groups_to_port(source, target, inputs):
+    sgs = source.runtime_properties.get('security_groups', [])
+    sec_id = target.get_attribute('id')
+    sgs.append(sec_id)
+    source.update_runtime_properties('security_groups', sgs)
+
+
+@utils.operation
+async def unlink_security_groups_from_port(source, target, inputs):
+    if 'security_groups' in source.runtime_properties:
+        del source.runtime_properties['security_groups']

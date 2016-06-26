@@ -389,6 +389,8 @@ node_types:
         type: string
       device_owner:
         type: string
+      security_groups:
+        type: string
     requirements:
       - authorization_form:
           capability: tosca.capabilities.Node
@@ -398,6 +400,10 @@ node_types:
           capability: tosca.capabilities.Node
           node: tosca.openstack.subnet
           relationship: tosca.openstack.networking.port_attached_to_subnet
+      - security_group:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.security_group
+          relationship: tosca.openstack.networking.security_groups_connected_to_port
       - proxy_to:
           capability: tosca.capabilities.Node
           node: tosca.openstack.subnet_port
@@ -519,8 +525,71 @@ node_types:
           relationship: tosca.openstack.networking.floatingip_connected_to_port
 
 ##################################################################################################
+# OpenStack Security group
+##################################################################################################
+
+  tosca.openstack.security_group:
+    derived_from: tosca.openstack.node
+    properties:
+      use_existing:
+        type: boolean
+        required: false
+        default: false
+      name_or_id:
+        type: string
+        required: true
+      description:
+        type: string
+        required: false
+      rules:
+        type: list
+        required: true
+#        Rule sample::
+#        direction: 'ingress'
+#        ethertype: 'IPv4'
+#        port_range_min: 1
+#        port_range_max: 65535
+#        protocol: 'tcp'
+#        remote_ip_prefix: '0.0.0.0/0'
+    attributes:
+      id:
+        type: string
+      description:
+        type: string
+      security_group_rules:
+        type: list
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.orchestration.network:security_group_create
+        delete:
+          implementation: openstack_plugin.orchestration.network:security_group_delete
+    requirements:
+      - authorization_form:
+          capability: tosca.capabilities.Node
+          node: tosca.openstack.authorization_form
+          relationship: tosca.openstack.access_and_security.inject_auth_properties
+
+
+##################################################################################################
 # OpenStack relationships
 ##################################################################################################
+
+  tosca.openstack.networking.security_groups_connected_to_port:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:link_security_groups_to_port
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.network:unlink_security_groups_from_port
+          inputs:
+            type: map
+
 
   tosca.openstack.networking.allocate_floatingip_from_network:
     derived_from: tosca.openstack.relationships.node

@@ -457,6 +457,8 @@ node_types:
           inputs:
             task_retries: 10
             task_retry_interval: 10
+        start:
+          implementation: openstack_plugin.orchestration.network:router_start
         delete:
           implementation: openstack_plugin.orchestration.network:router_delete
           inputs:

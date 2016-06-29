@@ -14,12 +14,13 @@
 
 from aiorchestra.core import utils
 
-async def create_network(context,
-                         name_or_id,
-                         neutronclient,
-                         is_external=False,
-                         admin_state_up=True,
-                         use_existing=False):
+
+async def create(context,
+                 name_or_id,
+                 neutronclient,
+                 is_external=False,
+                 admin_state_up=True,
+                 use_existing=False):
     """
     Creates network for OpenStack using Neutron API
     :param context: OrchestraContext instance
@@ -48,17 +49,17 @@ async def create_network(context,
             if not net_details['router:external']:
                 raise Exception(
                     'Network "{0}" is not an external. Details: {1}.'
-                     .format(net_details['id'], str(net_details)))
+                    .format(net_details['id'], str(net_details)))
 
     return net['network']
 
 
-async def delete_network(context,
-                         name_or_id,
-                         neutronclient,
-                         use_existing=False,
-                         task_retries=None,
-                         task_retry_interval=None):
+async def delete(context,
+                 name_or_id,
+                 neutronclient,
+                 use_existing=False,
+                 task_retries=None,
+                 task_retry_interval=None):
     """
     Deletes network for OpenStack using Neutron API
     :param context: OrchestraContext instance
@@ -69,7 +70,14 @@ async def delete_network(context,
     :param task_retry_interval: task retry interval
     :return:
     """
+    if use_existing:
+        context.logger.info('Network "{0}" remains as is, '
+                            'because it is an external resource.'
+                            .format(name_or_id))
+        return
+
     if not use_existing:
+        neutronclient.delete_network(name_or_id)
 
         async def is_gone():
             try:
@@ -78,10 +86,7 @@ async def delete_network(context,
             except Exception as ex:
                 context.logger.debug(str(ex))
                 return True
+
         await utils.retry(is_gone, exceptions=(Exception, ),
                           task_retries=task_retries,
                           task_retry_interval=task_retry_interval)
-    else:
-        context.logger.info('Network "{0}" remains as is, '
-                            'because it is an external resource.'
-                            .format(name_or_id))

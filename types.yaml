@@ -484,6 +484,14 @@ node_types:
 
   tosca.openstack.floating_ip:
     derived_from: tosca.openstack.node
+    properties:
+      use_existing:
+        type: boolean
+        required: false
+        default: false
+      existing_floating_ip_id:
+        type: string
+        required: false
     attributes:
       floating_network_id:
         type: string

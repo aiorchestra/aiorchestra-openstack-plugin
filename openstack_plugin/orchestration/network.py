@@ -19,6 +19,7 @@ from openstack_plugin.networking import network
 from openstack_plugin.networking import subnet
 from openstack_plugin.networking import port
 from openstack_plugin.networking import router
+from openstack_plugin.networking import floating_ip
 
 
 @utils.operation
@@ -304,19 +305,19 @@ async def unlink_router_from_external_network(source, target, inputs):
 @utils.operation
 async def add_port(source, target, inputs):
     nics = source.runtime_properties.get('nics', [])
-    port = {}
+    _port = {}
     neutron = clients.openstack.neutron(target)
     subnet = neutron.show_subnet(
         target.runtime_properties['subnet_id'])['subnet']
     ip_version = subnet['ip_version']
 
-    port.update({
+    _port.update({
         'net-id': target.runtime_properties['network_id'],
         'port-id': target.get_attribute('id'),
         'v{0}-fixed-ip'.format(str(ip_version)):
             target.get_attribute('ip_address')
     })
-    nics.append(port)
+    nics.append(_port)
     source.update_runtime_properties('nics', nics)
 
 
@@ -328,41 +329,37 @@ async def remove_port(source, target, inputs):
 
 @utils.operation
 async def floatingip_create(node, inputs):
-    log = node.context.logger
-    if 'floating_network_id' not in node.runtime_properties:
-        raise Exception('[{0}] - Network required for floating '
-                        'IP provisioning.'.format(node.name))
-    floating_ip_dict = {
-        'floating_network_id': node.runtime_properties[
-            'floating_network_id']
-    }
-    log.info('[{0}] - Attempting to create floating IP.'
-             .format(node.name))
-    if 'port_id' in node.runtime_properties:
-        log.info('[{0}] - Attempting to create floating IP for port "{1}".'
-                 .format(node.name, node.runtime_properties['port_id']))
-        port = {'port_id': node.runtime_properties['port_id']}
-        floating_ip_dict.update(port)
+    node.context.logger.info(
+        '[{0}] - Attempting to create floating IP.'
+        .format(node.name))
+    existing_floating_ip_id = node.properties.get(
+        'existing_floating_ip_id')
+    use_existing = node.properties['use_existing']
     neutron = clients.openstack.neutron(node)
+    port_id = node.runtime_properties.get('port_id')
+    floating_network_id = node.runtime_properties.get(
+        'floating_network_id')
 
-    fip = neutron.create_floatingip(body={
-        'floatingip': floating_ip_dict})['floatingip']
+    fip = await floating_ip.create(
+        node.context, neutron, floating_network_id,
+        port_id, use_existing=use_existing,
+        existing_floating_ip_id=existing_floating_ip_id)
 
     node.batch_update_runtime_properties(**fip)
-    log.info('[{0}] - Floating IP created.'
-             .format(node.name))
+    node.context.logger.info(
+        '[{0}] - Floating IP created.' .format(node.name))
 
 
 @utils.operation
 async def floatingip_delete(node, inputs):
-    log = node.context.logger
-    log.info('[{0}] - Attempting to delete floating IP.'
-             .format(node.name))
+    node.context.logger.info(
+        '[{0}] - Attempting to delete floating IP.'.format(node.name))
     fip = node.runtime_properties['id']
+    use_existing = node.properties['use_existing']
     neutron = clients.openstack.neutron(node)
-    neutron.delete_floatingip(fip)
-    log.info('[{0}] - Floating IP deleted.'
-             .format(node.name))
+
+    await floating_ip.delete(node.context, neutron,
+                             fip, use_existing=use_existing)
 
 
 @utils.operation

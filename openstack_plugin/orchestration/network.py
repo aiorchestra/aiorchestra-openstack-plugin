@@ -15,6 +15,12 @@
 from aiorchestra.core import utils
 
 from openstack_plugin.common import clients
+from openstack_plugin.networking import network
+from openstack_plugin.networking import subnet
+from openstack_plugin.networking import port
+from openstack_plugin.networking import router
+from openstack_plugin.networking import floating_ip
+from openstack_plugin.networking import security_group_and_rules
 
 
 @utils.operation
@@ -22,21 +28,17 @@ async def network_create(node, inputs):
     node.context.logger.info(
         '[{0}] - Attempting to create network.'.format(node.name))
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        network = {'name': node.properties['name_or_id'],
-                   'admin_state_up': True}
-        net = neutron.create_network({'network': network})
-    else:
-        node.context.logger.info(
-            '[{0}] - Using existing network.'.format(node.name))
-        is_external = node.properties['is_external']
-        net = neutron.show_network(node.properties['name_or_id'])
-        if is_external:
-            net_details = net['network']
-            if not net_details['router:external']:
-                raise Exception('[{0}] - Network "{1}" is not an external.'
-                                .format(node.name, net_details['id']))
-    node.batch_update_runtime_properties(**net['network'])
+
+    net = await network.create(
+        node.context,
+        node.properties['name_or_id'],
+        neutron,
+        is_external=node.properties['is_external'],
+        admin_state_up=True,
+        use_existing=node.properties['use_existing'],
+    )
+
+    node.batch_update_runtime_properties(**net)
     node.context.logger.info(
         '[{0}] - Network "{1}" created.'.format(
             node.name, node.properties['name_or_id']))
@@ -49,27 +51,18 @@ async def network_delete(node, inputs):
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        neutron.delete_network(node.attributes['id'])
+    await network.delete(
+        node.context,
+        node.get_attribute('id'),
+        neutron,
+        use_existing=node.properties['use_existing'],
+        task_retries=task_retries,
+        task_retry_interval=task_retry_interval
+    )
 
-        async def is_gone():
-            try:
-                neutron.show_network(node.attributes['id'])
-                return False
-            except Exception as ex:
-                node.context.logger.debug(str(ex))
-                return True
-        await utils.retry(is_gone, exceptions=(Exception, ),
-                          task_retries=task_retries,
-                          task_retry_interval=task_retry_interval)
-        node.context.logger.info(
-            '[{0}] - Network "{1}" deleted.'.format(
-                node.name, node.properties['name_or_id']))
-    else:
-        node.context.logger.info('[{0}] - Network "{1}" remains as is, '
-                                 'because it is an external resource'
-                                 .format(node.name,
-                                         node.attributes['id']))
+    node.context.logger.info(
+        '[{0}] - Network "{1}" deleted.'.format(
+            node.name, node.properties['name_or_id']))
 
 
 # https://wiki.openstack.org/wiki/Neutron/APIv2-specification#Create_Subnet
@@ -79,49 +72,39 @@ async def subnet_create(node, inputs):
         raise Exception('Unable to create subnet for node "{0}". '
                         'It is necessary to use relationship '
                         'to link subnet to network.'.format(node.name))
+    node.context.logger.info(
+        '[{0}] - Attempting to create subnet "{1}" for network "{2}".'
+        .format(node.name, node.properties['name_or_id'],
+                node.runtime_properties['network_id']))
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        network_id = node.runtime_properties['network_id']
-        name = node.properties['name_or_id']
-        ip_version = node.properties['ip_version']
-        cidr = node.properties['cidr']
-        allocation_pools = node.properties['allocation_pools']
-        dns_nameservers = node.properties['dns_nameservers']
-        subnet_body = {
-            'subnet': {
-                'name': name,
-                'network_id': network_id,
-                'ip_version': ip_version,
-                'cidr': cidr,
-                'allocation_pools': allocation_pools,
-                'dns_nameservers': dns_nameservers,
-            }
-        }
-        subnet = neutron.create_subnet(body=subnet_body)
-        if 'router_id' in node.runtime_properties:
-            router_node = node.runtime_properties['router_node']
-            router_id = node.runtime_properties['router_id']
-            node.context.logger.info('[{0}] - Attaching subnet "{1}" '
-                                     'to router "{2}".'
-                                     .format(node.name,
-                                             subnet['subnet']['id'],
-                                             router_id))
-            neutron.add_interface_router(
-                router_id, {'subnet_id': subnet['subnet']['id']})
-            router = neutron.show_router(router_id)['router']
-            router_node.batch_update_runtime_properties(**router)
-        subnet = neutron.show_subnet(subnet['subnet']['id'])
-    else:
-        node.context.logger.info('[{0}] - Using existing subnet "{1}".'
-                                 .format(node.name,
-                                         node.properties['name_or_id']))
-        subnet = neutron.show_subnet(node.properties['name_or_id'])
 
-    node.batch_update_runtime_properties(**subnet['subnet'])
+    network_id = node.runtime_properties.get('network_id')
+    name_or_id = node.properties.get('name_or_id')
+    ip_version = node.properties.get('ip_version')
+    cidr = node.properties.get('cidr')
+    allocation_pools = node.properties.get('allocation_pools')
+    dns_nameservers = node.properties.get('dns_nameservers')
+    router_id = node.runtime_properties.get('router_id')
+    use_existing = node.properties['use_existing']
+
+    _subnet = await subnet.create(
+        node.context,
+        name_or_id,
+        neutron,
+        network_id,
+        ip_version,
+        cidr,
+        allocation_pools,
+        dns_nameservers,
+        router_id=router_id,
+        use_existing=use_existing
+    )
+
+    node.batch_update_runtime_properties(**_subnet)
     node.context.logger.info(
         '[{0}] - Subnet "{1}" for network "{2}" was created.'
         .format(node.name,
-                subnet['subnet']['id'],
+                _subnet['id'],
                 node.runtime_properties['network_id']))
 
 
@@ -133,40 +116,15 @@ async def subnet_delete(node, inputs):
                              .format(node.name,
                                      node.properties['name_or_id']))
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        subnet = neutron.show_subnet(node.get_attribute('id'))
-        if 'router_id' in node.runtime_properties:
-            router_node = node.runtime_properties['router_node']
-            router_id = node.runtime_properties['router_id']
-            node.context.logger.info('[{0}] - Attaching subnet "{1}" '
-                                     'to router "{2}".'
-                                     .format(node.name,
-                                             subnet['subnet']['id'],
-                                             router_id))
-            neutron.remove_interface_router(
-                router_id, {'subnet_id': node.get_attribute('id')})
-            router = neutron.show_router(router_id)['router']
-            router_node.batch_update_runtime_properties(**router)
-        neutron.delete_subnet(node.get_attribute('id'))
+    router_id = node.runtime_properties.get('router_id')
+    use_existing = node.properties['use_existing']
+    name_or_id = node.get_attribute('id')
 
-        async def is_gone():
-            try:
-                neutron.show_subnet(node.get_attribute('id'))
-                return False
-            except Exception as ex:
-                node.context.logger.debug(str(ex))
-                return True
-
-        await utils.retry(is_gone, exceptions=(Exception,),
-                          task_retries=task_retries,
-                          task_retry_interval=task_retry_interval)
-        node.context.logger.info('[{0}] - Subnet "{1}" deleted.'
-                                 .format(node.name,
-                                         node.get_attribute('id')))
-    else:
-        node.context.logger.info('[{0}] - Subnet remains as is, '
-                                 'because it is external resource.'
-                                 .format(node.name))
+    await subnet.delete(node.context, name_or_id, neutron,
+                        router_id=router_id,
+                        use_existing=use_existing,
+                        task_retry_interval=task_retry_interval,
+                        task_retries=task_retries)
 
 
 @utils.operation
@@ -195,55 +153,29 @@ async def unlink_subnet(source, target, inputs):
 
 @utils.operation
 async def port_create(node, inputs):
-    if 'network_id' not in node.runtime_properties:
-        raise Exception('Unable to create subnet for node "{0}". '
-                        'It is necessary to use relationship '
-                        'to link subnet to network.'.format(node.name))
+
+    node.context.logger.info(
+        '[{0}] - Attempting to create subnet port.'
+        .format(node.name))
+
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        name_or_id = node.properties['name_or_id']
-        network_id = node.runtime_properties['network_id']
-        admit_state_up = True
-        subnet_id = node.runtime_properties['subnet_id']
-        node.context.logger.info('[{0}] - Attempting to create port at '
-                                 'subnet "{1}" of network "{2}".'
-                                 .format(node.name,
-                                         subnet_id,
-                                         network_id))
-        port_dict = {
-            'port': {
-                'admin_state_up': admit_state_up,
-                'name': name_or_id,
-                'network_id': network_id,
-                'fixed_ips': [
-                    {
-                        'subnet_id': subnet_id
-                    }
-                ]
+    name_or_id = node.properties['name_or_id']
+    network_id = node.runtime_properties.get('network_id')
+    admit_state_up = True
+    subnet_id = node.runtime_properties.get('subnet_id')
+    security_groups = node.runtime_properties.get('security_groups')
+    use_existing = node.properties['use_existing']
 
-            }
-        }
+    _port = await port.create(node.context, name_or_id, neutron,
+                              network_id, subnet_id,
+                              admin_state_up=admit_state_up,
+                              security_groups=security_groups,
+                              use_existing=use_existing)
 
-        if 'security_groups' in node.runtime_properties:
-            port_dict['port']['security_groups'] = (
-                node.runtime_properties['security_groups'])
+    fixed_ips = _port['fixed_ips'].pop()
+    node.batch_update_runtime_properties(**fixed_ips)
 
-        port = neutron.create_port(body=port_dict)['port']
-        node.context.logger.info(
-            '[{0}] - Port at subnet "{1}" of network "{2}".'
-            .format(node.name,
-                    subnet_id,
-                    network_id))
-    else:
-        node.context.logger.info('[{0}] - Using existing port "{1}".'
-                                 .format(node.name,
-                                         node.properties['name_or_id']))
-        port = neutron.show_port(node.properties['name_or_id'])['port']
-    for k, v in port.items():
-        if k == 'fixed_ips':
-            ip_and_subnet = port[k].pop()
-            node.batch_update_runtime_properties(**ip_and_subnet)
-    node.batch_update_runtime_properties(**port)
+    node.batch_update_runtime_properties(**_port)
     node.context.logger.info(
         '[{0}] - Port created for subnet "{1}".'
         .format(node.name, node.runtime_properties['subnet_id']))
@@ -254,26 +186,13 @@ async def port_delete(node, inputs):
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        id = node.get_attribute('id')
-        neutron.delete_port(id)
+    use_existing = node.properties['use_existing']
+    name_or_id = node.get_attribute('id')
 
-        async def is_gone():
-            try:
-                neutron.show_port(id)
-                return False
-            except Exception as ex:
-                node.context.logger.debug(str(ex))
-                return True
-
-        await utils.retry(is_gone, exceptions=(Exception, ),
-                          task_retries=task_retries,
-                          task_retry_interval=task_retry_interval)
-    else:
-        node.context.logger.info(
-            '[{0}] - Leaving port "{1}" as is, '
-            'because of it is external resource.'
-            .format(node.name, node.get_attribute('id')))
+    await port.delete(node.context, name_or_id, neutron,
+                      use_existing=use_existing,
+                      task_retry_interval=task_retry_interval,
+                      task_retries=task_retries)
 
 
 @utils.operation
@@ -305,29 +224,34 @@ async def unlink_port(source, target, inputs):
 
 @utils.operation
 async def router_create(node, inputs):
+    node.context.logger.info('[{0}] - Attempting to create router.'
+                             .format(node.name))
     neutron = clients.openstack.neutron(node)
+
     name_or_id = node.properties['name_or_id']
-    if not node.properties['use_existing']:
-        node.context.logger.info(
-            '[{0}] - Attempting to create router "{1}".'
-            .format(node.name, name_or_id))
-        router_dict = {
-            'router': {
-                'name': name_or_id,
-            }
-        }
-        if 'external_gateway_info' in node.runtime_properties:
-            router_dict['router'].update(node.runtime_properties[
-                                   'external_gateway_info'])
-        router = neutron.create_router(router_dict)['router']
-    else:
-        node.context.logger.info('[{0}] - Using existing router "{1}".'
-                                 .format(node.name, name_or_id))
-        router = neutron.show_router(name_or_id)['router']
-    node.batch_update_runtime_properties(**router)
+    use_existing = node.properties['use_existing']
+    external_gateway_info = node.runtime_properties.get(
+        'external_gateway_info', {})
+
+    _router = await router.create(
+        node.context, name_or_id, neutron,
+        external_gateway_info=external_gateway_info,
+        use_existing=use_existing)
+
+    node.batch_update_runtime_properties(**_router)
     node.context.logger.info(
         '[{0}] - Router "{1}" created.'
         .format(node.name, name_or_id))
+
+
+@utils.operation
+async def router_start(node, inputs):
+    _id = node.get_attribute('id')
+    neutron = clients.openstack.neutron(node)
+    router = neutron.show_router(_id)['router']
+    node.batch_update_runtime_properties(**router)
+    node.context.logger.info('[{0}] - Router started.'
+                             .format(node.name))
 
 
 @utils.operation
@@ -335,28 +259,19 @@ async def router_delete(node, inputs):
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     neutron = clients.openstack.neutron(node)
-    name_or_id = node.properties['name_or_id']
-    if not node.properties['use_existing']:
-        node.context.logger.info(
-            '[{0}] - Attempting to delete router "{1}".'
-            .format(node.name, name_or_id))
-        neutron.delete_router(node.get_attribute('id'))
+    name_or_id = node.get_attribute('id')
+    use_existing = node.properties['use_existing']
+    node.context.logger.info(
+        '[{0}] - Attempting to delete router "{0}".'
+        .format(node.name, name_or_id))
 
-        async def is_gone():
-            try:
-                neutron.show_router(node.get_attribute('id'))
-                return False
-            except Exception as ex:
-                node.context.logger.debug(str(ex))
-                return True
+    await router.delete(node.context, name_or_id, neutron,
+                        use_existing=use_existing,
+                        task_retry_interval=task_retry_interval,
+                        task_retries=task_retries)
 
-        await utils.retry(is_gone, exceptions=(Exception, ),
-                          task_retry_interval=task_retry_interval,
-                          task_retries=task_retries)
-    else:
-        node.context.logger.info('[{0}] - Leaving router "{1}" as is, '
-                                 'because of it is external resource.'
-                                 .format(node.name, name_or_id))
+    node.context.logger.info('[{0}] - Router deleted.'
+                             .format(node.name))
 
 
 @utils.operation
@@ -391,19 +306,19 @@ async def unlink_router_from_external_network(source, target, inputs):
 @utils.operation
 async def add_port(source, target, inputs):
     nics = source.runtime_properties.get('nics', [])
-    port = {}
+    _port = {}
     neutron = clients.openstack.neutron(target)
     subnet = neutron.show_subnet(
         target.runtime_properties['subnet_id'])['subnet']
     ip_version = subnet['ip_version']
 
-    port.update({
+    _port.update({
         'net-id': target.runtime_properties['network_id'],
         'port-id': target.get_attribute('id'),
         'v{0}-fixed-ip'.format(str(ip_version)):
             target.get_attribute('ip_address')
     })
-    nics.append(port)
+    nics.append(_port)
     source.update_runtime_properties('nics', nics)
 
 
@@ -415,41 +330,37 @@ async def remove_port(source, target, inputs):
 
 @utils.operation
 async def floatingip_create(node, inputs):
-    log = node.context.logger
-    if 'floating_network_id' not in node.runtime_properties:
-        raise Exception('[{0}] - Network required for floating '
-                        'IP provisioning.'.format(node.name))
-    floating_ip_dict = {
-        'floating_network_id': node.runtime_properties[
-            'floating_network_id']
-    }
-    log.info('[{0}] - Attempting to create floating IP.'
-             .format(node.name))
-    if 'port_id' in node.runtime_properties:
-        log.info('[{0}] - Attempting to create floating IP for port "{1}".'
-                 .format(node.name, node.runtime_properties['port_id']))
-        port = {'port_id': node.runtime_properties['port_id']}
-        floating_ip_dict.update(port)
+    node.context.logger.info(
+        '[{0}] - Attempting to create floating IP.'
+        .format(node.name))
+    existing_floating_ip_id = node.properties.get(
+        'existing_floating_ip_id')
+    use_existing = node.properties['use_existing']
     neutron = clients.openstack.neutron(node)
+    port_id = node.runtime_properties.get('port_id')
+    floating_network_id = node.runtime_properties.get(
+        'floating_network_id')
 
-    fip = neutron.create_floatingip(body={
-        'floatingip': floating_ip_dict})['floatingip']
+    fip = await floating_ip.create(
+        node.context, neutron, floating_network_id,
+        port_id, use_existing=use_existing,
+        existing_floating_ip_id=existing_floating_ip_id)
 
     node.batch_update_runtime_properties(**fip)
-    log.info('[{0}] - Floating IP created.'
-             .format(node.name))
+    node.context.logger.info(
+        '[{0}] - Floating IP created.' .format(node.name))
 
 
 @utils.operation
 async def floatingip_delete(node, inputs):
-    log = node.context.logger
-    log.info('[{0}] - Attempting to delete floating IP.'
-             .format(node.name))
+    node.context.logger.info(
+        '[{0}] - Attempting to delete floating IP.'.format(node.name))
     fip = node.runtime_properties['id']
+    use_existing = node.properties['use_existing']
     neutron = clients.openstack.neutron(node)
-    neutron.delete_floatingip(fip)
-    log.info('[{0}] - Floating IP deleted.'
-             .format(node.name))
+
+    await floating_ip.delete(node.context, neutron,
+                             fip, use_existing=use_existing)
 
 
 @utils.operation
@@ -503,50 +414,58 @@ async def security_group_create(node, inputs):
     log = node.context.logger
     neutron = clients.openstack.neutron(node)
     name_or_id = node.properties['name_or_id']
-    if not node.properties['use_existing']:
-        log.info('[{0}] - Attempting to create security group.'
-                 .format(node.name))
-        description = node.properties.get('description')
-        rules = node.properties.get('rules', [])
-        sg_dict = {
-            'description': description,
-            'name': name_or_id,
-        }
-        sg = neutron.create_security_group(
-            {'security_group': sg_dict})['security_group']
-        log.info('[{0}] - Security group created.'
-                 .format(node.name))
-        node.batch_update_runtime_properties(**sg)
-        for rule in rules:
-            rule.update(security_group_id=sg['id'])
-            log.info('[{0}] - Attempting to create rule for '
-                     'security group "{1}".'
-                     .format(node.name, sg['id']))
+    use_existing = node.properties['use_existing']
+    description = node.properties.get('description')
+    rules = node.runtime_properties.get('security_group_rules', [])
+    log.info('[{0}] - Attempting to create security group.'
+             .format(node.name))
+    sg = await security_group_and_rules.create(
+        node.context, name_or_id, neutron,
+        description=description, use_existing=use_existing)
 
-            _r = neutron.create_security_group_rule(
-                {'security_group_rule': rule}
-            )['security_group_rule']
+    node.batch_update_runtime_properties(**sg)
+    _rs = [list(r.values()).pop() for r in rules]
 
-            log.info('[{0}] - Security group rule create: "{1}".'
-                     .format(node.name, _r['id']))
-        sg = neutron.show_security_group(sg['id'])
-    else:
-        log.info('[{0}] - Using existing security group.'.format(node.name))
-        sg = neutron.show_security_group(name_or_id)['security_group']
+    await security_group_and_rules.create_rules(
+        node.context, sg['id'], _rs, neutron)
+
+    sg = neutron.show_security_group(sg['id'])
 
     node.batch_update_runtime_properties(**sg)
 
 
 @utils.operation
 async def security_group_delete(node, inputs):
-    log = node.context.logger
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        id = node.get_attribute('id')
-        neutron.delete_security_group(id)
-    else:
-        log.info('[{0}] - Security group remains as is, '
-                 'because it is an external resource'.format(node.name))
+    name_or_id = node.get_attribute('id')
+    use_existing = node.properties['use_existing']
+
+    await security_group_and_rules.delete(node.context, name_or_id,
+                                          neutron, use_existing=use_existing)
+
+
+@utils.operation
+async def connect_security_groups_rule(source, target, inputs):
+    source.context.logger.info('[{0} -----> {1}] - Connecting security group '
+                               'rule to security group.'
+                               .format(target.name, source.name))
+    rule = target.properties
+    rules = source.runtime_properties.get('security_group_rules', [])
+    rules.append({target.name: rule})
+    source.update_runtime_properties('security_group_rules', rules)
+
+
+@utils.operation
+async def disconnect_security_groups_rule(source, target, inputs):
+    source.context.logger.info('[{0} --X--> {1}] - '
+                               'Disconnecting security group '
+                               'rule from security group.'
+                               .format(target.name, source.name))
+    rules = source.runtime_properties.get(
+            'security_group_rules', [])
+    for name_and_rule in rules:
+        if target.name == list(name_and_rule.keys()).pop():
+            del name_and_rule[rules.index(name_and_rule)]
 
 
 @utils.operation

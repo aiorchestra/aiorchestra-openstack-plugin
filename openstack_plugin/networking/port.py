@@ -47,11 +47,11 @@ async def create(context, name_or_id, neutronclient,
 
         if security_groups:
             port_dict['port']['security_groups'] = security_groups
-            neutronclient.update_port(name_or_id, body=port_dict)
 
         context.logger.info('Creating port with identifiers: {0}'
                             .format(str(port_dict)))
         port = neutronclient.create_port(body=port_dict)
+
     else:
         context.logger.info('Using existing port "{0}".'
                             .format(name_or_id))

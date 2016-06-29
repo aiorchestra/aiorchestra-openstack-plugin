@@ -49,23 +49,36 @@ topology_template:
         auth_url:  { get_input: keystone_url }
         region_name:  { get_input: openstack_region }
 
+    orchestra_security_group_tcp_ingress:
+      type: tosca.openstack.security_group.rule
+      properties:
+        direction: 'ingress'
+        ethertype: 'IPv4'
+        port_range_min: 1
+        port_range_max: 65535
+        protocol: 'tcp'
+        remote_ip_prefix: '0.0.0.0/0'
+
+    orchestra_security_group_tcp_egress:
+      type: tosca.openstack.security_group.rule
+      properties:
+        direction: 'egress'
+        ethertype: 'IPv4'
+        port_range_min: 1
+        port_range_max: 65535
+        protocol: 'tcp'
+        remote_ip_prefix: '0.0.0.0/0'
+
     orchestra_security_group:
       type: tosca.openstack.security_group
       properties:
         name_or_id: 'test'
         description: 'test'
-        rules:
-          - direction: 'ingress'
-            ethertype: 'IPv4'
-            port_range_min: 1
-            port_range_max: 65535
-            protocol: 'tcp'
-            remote_ip_prefix: '0.0.0.0/0'
-          - direction: 'egress'
-            ethertype: 'IPv4'
-            port_range_min: 1
-            port_range_max: 65535
-            protocol: 'tcp'
-            remote_ip_prefix: '0.0.0.0/0'
       requirements:
         - authorization_form: auth
+        - rule_egress:
+            node: orchestra_security_group_tcp_egress
+            relationship: tosca.openstack.networking.security_groups_rule_connected_to_security_group
+        - rule_ingress:
+            node: orchestra_security_group_tcp_ingress
+            relationship: tosca.openstack.networking.security_groups_rule_connected_to_security_group

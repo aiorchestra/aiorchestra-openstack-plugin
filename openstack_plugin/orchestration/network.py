@@ -20,6 +20,7 @@ from openstack_plugin.networking import subnet
 from openstack_plugin.networking import port
 from openstack_plugin.networking import router
 from openstack_plugin.networking import floating_ip
+from openstack_plugin.networking import security_group_and_rules
 
 
 @utils.operation
@@ -413,50 +414,58 @@ async def security_group_create(node, inputs):
     log = node.context.logger
     neutron = clients.openstack.neutron(node)
     name_or_id = node.properties['name_or_id']
-    if not node.properties['use_existing']:
-        log.info('[{0}] - Attempting to create security group.'
-                 .format(node.name))
-        description = node.properties.get('description')
-        rules = node.properties.get('rules', [])
-        sg_dict = {
-            'description': description,
-            'name': name_or_id,
-        }
-        sg = neutron.create_security_group(
-            {'security_group': sg_dict})['security_group']
-        log.info('[{0}] - Security group created.'
-                 .format(node.name))
-        node.batch_update_runtime_properties(**sg)
-        for rule in rules:
-            rule.update(security_group_id=sg['id'])
-            log.info('[{0}] - Attempting to create rule for '
-                     'security group "{1}".'
-                     .format(node.name, sg['id']))
+    use_existing = node.properties['use_existing']
+    description = node.properties.get('description')
+    rules = node.runtime_properties.get('security_group_rules', [])
+    log.info('[{0}] - Attempting to create security group.'
+             .format(node.name))
+    sg = await security_group_and_rules.create(
+        node.context, name_or_id, neutron,
+        description=description, use_existing=use_existing)
 
-            _r = neutron.create_security_group_rule(
-                {'security_group_rule': rule}
-            )['security_group_rule']
+    node.batch_update_runtime_properties(**sg)
+    _rs = [list(r.values()).pop() for r in rules]
 
-            log.info('[{0}] - Security group rule create: "{1}".'
-                     .format(node.name, _r['id']))
-        sg = neutron.show_security_group(sg['id'])
-    else:
-        log.info('[{0}] - Using existing security group.'.format(node.name))
-        sg = neutron.show_security_group(name_or_id)['security_group']
+    await security_group_and_rules.create_rules(
+        node.context, sg['id'], _rs, neutron)
+
+    sg = neutron.show_security_group(sg['id'])
 
     node.batch_update_runtime_properties(**sg)
 
 
 @utils.operation
 async def security_group_delete(node, inputs):
-    log = node.context.logger
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        id = node.get_attribute('id')
-        neutron.delete_security_group(id)
-    else:
-        log.info('[{0}] - Security group remains as is, '
-                 'because it is an external resource'.format(node.name))
+    name_or_id = node.get_attribute('id')
+    use_existing = node.properties['use_existing']
+
+    await security_group_and_rules.delete(node.context, name_or_id,
+                                          neutron, use_existing=use_existing)
+
+
+@utils.operation
+async def connect_security_groups_rule(source, target, inputs):
+    source.context.logger.info('[{0} -----> {1}] - Connecting security group '
+                               'rule to security group.'
+                               .format(target.name, source.name))
+    rule = target.properties
+    rules = source.runtime_properties.get('security_group_rules', [])
+    rules.append({target.name: rule})
+    source.update_runtime_properties('security_group_rules', rules)
+
+
+@utils.operation
+async def disconnect_security_groups_rule(source, target, inputs):
+    source.context.logger.info('[{0} --X--> {1}] - '
+                               'Disconnecting security group '
+                               'rule from security group.'
+                               .format(target.name, source.name))
+    rules = source.runtime_properties.get(
+            'security_group_rules', [])
+    for name_and_rule in rules:
+        if target.name == list(name_and_rule.keys()).pop():
+            del name_and_rule[rules.index(name_and_rule)]
 
 
 @utils.operation

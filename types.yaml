@@ -298,7 +298,7 @@ node_types:
         type: string
         required: true
       ip_version:
-        type: int
+        type: integer
         default: 4
         required: true
       cidr:
@@ -535,7 +535,7 @@ node_types:
           relationship: tosca.openstack.networking.floatingip_connected_to_port
 
 ##################################################################################################
-# OpenStack Security group
+# OpenStack Security group and Rules
 ##################################################################################################
 
   tosca.openstack.security_group:
@@ -551,16 +551,6 @@ node_types:
       description:
         type: string
         required: false
-      rules:
-        type: list
-        required: true
-#        Rule sample::
-#        direction: 'ingress'
-#        ethertype: 'IPv4'
-#        port_range_min: 1
-#        port_range_max: 65535
-#        protocol: 'tcp'
-#        remote_ip_prefix: '0.0.0.0/0'
     attributes:
       id:
         type: string
@@ -581,10 +571,59 @@ node_types:
           node: tosca.openstack.authorization_form
           relationship: tosca.openstack.access_and_security.inject_auth_properties
 
+  tosca.openstack.security_group.rule:
+    derived_from: tosca.openstack.node
+    properties:
+      direction:
+        type: string
+        required: true
+        constraints:
+          - valid_values: ['ingress', 'egress']
+      ethertype:
+        type: string
+        constraints:
+          - valid_values: ['IPv4', 'IPv6']
+        required: true
+      port_range_min:
+        type: integer
+        required: true
+      port_range_max:
+        type: integer
+        required: true
+      protocol:
+        type: string
+        constraints:
+          - valid_values: ['tcp', 'icmp', 'udp']
+        required: true
+      remote_ip_prefix:
+        type: string
+        required: true
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: aiorchestra.core.noop:noop
+        delete:
+          implementation: aiorchestra.core.noop:noop
+
 
 ##################################################################################################
 # OpenStack relationships
 ##################################################################################################
+
+  tosca.openstack.networking.security_groups_rule_connected_to_security_group:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.network:connect_security_groups_rule
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.network:disconnect_security_groups_rule
+          inputs:
+            type: map
 
   tosca.openstack.networking.security_groups_connected_to_port:
     derived_from: tosca.openstack.relationships.node

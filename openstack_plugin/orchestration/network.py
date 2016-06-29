@@ -15,6 +15,7 @@
 from aiorchestra.core import utils
 
 from openstack_plugin.common import clients
+from openstack_plugin.networking import network
 
 
 @utils.operation
@@ -22,21 +23,17 @@ async def network_create(node, inputs):
     node.context.logger.info(
         '[{0}] - Attempting to create network.'.format(node.name))
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        network = {'name': node.properties['name_or_id'],
-                   'admin_state_up': True}
-        net = neutron.create_network({'network': network})
-    else:
-        node.context.logger.info(
-            '[{0}] - Using existing network.'.format(node.name))
-        is_external = node.properties['is_external']
-        net = neutron.show_network(node.properties['name_or_id'])
-        if is_external:
-            net_details = net['network']
-            if not net_details['router:external']:
-                raise Exception('[{0}] - Network "{1}" is not an external.'
-                                .format(node.name, net_details['id']))
-    node.batch_update_runtime_properties(**net['network'])
+
+    net = await network.create_network(
+        node.context,
+        node.properties['name_or_id'],
+        neutron,
+        is_external=node.properties['is_external'],
+        admin_state_up=True,
+        use_existing=node.properties['use_existing'],
+    )
+
+    node.batch_update_runtime_properties(**net)
     node.context.logger.info(
         '[{0}] - Network "{1}" created.'.format(
             node.name, node.properties['name_or_id']))
@@ -49,27 +46,19 @@ async def network_delete(node, inputs):
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        neutron.delete_network(node.attributes['id'])
 
-        async def is_gone():
-            try:
-                neutron.show_network(node.attributes['id'])
-                return False
-            except Exception as ex:
-                node.context.logger.debug(str(ex))
-                return True
-        await utils.retry(is_gone, exceptions=(Exception, ),
-                          task_retries=task_retries,
-                          task_retry_interval=task_retry_interval)
-        node.context.logger.info(
-            '[{0}] - Network "{1}" deleted.'.format(
-                node.name, node.properties['name_or_id']))
-    else:
-        node.context.logger.info('[{0}] - Network "{1}" remains as is, '
-                                 'because it is an external resource'
-                                 .format(node.name,
-                                         node.attributes['id']))
+    await network.delete_network(
+        node.context,
+        node.get_attribute('id'),
+        neutron,
+        use_existing=node.properties['use_existing'],
+        task_retries=task_retries,
+        task_retry_interval=task_retry_interval
+    )
+
+    node.context.logger.info(
+        '[{0}] - Network "{1}" deleted.'.format(
+            node.name, node.properties['name_or_id']))
 
 
 # https://wiki.openstack.org/wiki/Neutron/APIv2-specification#Create_Subnet

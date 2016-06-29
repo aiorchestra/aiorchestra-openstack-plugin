@@ -84,7 +84,7 @@ async def delete(context, name_or_id, neutronclient,
     :return:
     """
     if router_id:
-        context.logger.info('Attaching subnet "{0}" '
+        context.logger.info('Detaching subnet "{0}" '
                             'to router "{1}".'
                             .format(name_or_id, router_id))
         neutronclient.remove_interface_router(

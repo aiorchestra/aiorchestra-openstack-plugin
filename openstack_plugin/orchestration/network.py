@@ -18,6 +18,7 @@ from openstack_plugin.common import clients
 from openstack_plugin.networking import network
 from openstack_plugin.networking import subnet
 from openstack_plugin.networking import port
+from openstack_plugin.networking import router
 
 
 @utils.operation
@@ -221,26 +222,21 @@ async def unlink_port(source, target, inputs):
 
 @utils.operation
 async def router_create(node, inputs):
+    node.context.logger.info('[{0}] - Attempting to create router.'
+                             .format(node.name))
     neutron = clients.openstack.neutron(node)
+
     name_or_id = node.properties['name_or_id']
-    if not node.properties['use_existing']:
-        node.context.logger.info(
-            '[{0}] - Attempting to create router "{1}".'
-            .format(node.name, name_or_id))
-        router_dict = {
-            'router': {
-                'name': name_or_id,
-            }
-        }
-        if 'external_gateway_info' in node.runtime_properties:
-            router_dict['router'].update(node.runtime_properties[
-                                   'external_gateway_info'])
-        router = neutron.create_router(router_dict)['router']
-    else:
-        node.context.logger.info('[{0}] - Using existing router "{1}".'
-                                 .format(node.name, name_or_id))
-        router = neutron.show_router(name_or_id)['router']
-    node.batch_update_runtime_properties(**router)
+    use_existing = node.properties['use_existing']
+    external_gateway_info = node.runtime_properties.get(
+        'external_gateway_info', {})
+
+    _router = await router.create(
+        node.context, name_or_id, neutron,
+        external_gateway_info=external_gateway_info,
+        use_existing=use_existing)
+
+    node.batch_update_runtime_properties(**_router)
     node.context.logger.info(
         '[{0}] - Router "{1}" created.'
         .format(node.name, name_or_id))
@@ -248,12 +244,12 @@ async def router_create(node, inputs):
 
 @utils.operation
 async def router_start(node, inputs):
-    node.context.logger.info('[{0}] - Router started.'
-                             .format(node.name))
     _id = node.get_attribute('id')
     neutron = clients.openstack.neutron(node)
     router = neutron.show_router(_id)['router']
     node.batch_update_runtime_properties(**router)
+    node.context.logger.info('[{0}] - Router started.'
+                             .format(node.name))
 
 
 @utils.operation
@@ -261,28 +257,19 @@ async def router_delete(node, inputs):
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     neutron = clients.openstack.neutron(node)
-    name_or_id = node.properties['name_or_id']
-    if not node.properties['use_existing']:
-        node.context.logger.info(
-            '[{0}] - Attempting to delete router "{1}".'
-            .format(node.name, name_or_id))
-        neutron.delete_router(node.get_attribute('id'))
+    name_or_id = node.get_attribute('id')
+    use_existing = node.properties['use_existing']
+    node.context.logger.info(
+        '[{0}] - Attempting to delete router "{0}".'
+        .format(node.name, name_or_id))
 
-        async def is_gone():
-            try:
-                neutron.show_router(node.get_attribute('id'))
-                return False
-            except Exception as ex:
-                node.context.logger.debug(str(ex))
-                return True
+    await router.delete(node.context, name_or_id, neutron,
+                        use_existing=use_existing,
+                        task_retry_interval=task_retry_interval,
+                        task_retries=task_retries)
 
-        await utils.retry(is_gone, exceptions=(Exception, ),
-                          task_retry_interval=task_retry_interval,
-                          task_retries=task_retries)
-    else:
-        node.context.logger.info('[{0}] - Leaving router "{1}" as is, '
-                                 'because of it is external resource.'
-                                 .format(node.name, name_or_id))
+    node.context.logger.info('[{0}] - Router deleted.'
+                             .format(node.name))
 
 
 @utils.operation

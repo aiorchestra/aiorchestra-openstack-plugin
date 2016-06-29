@@ -17,6 +17,7 @@ from aiorchestra.core import utils
 from openstack_plugin.common import clients
 from openstack_plugin.networking import network
 from openstack_plugin.networking import subnet
+from openstack_plugin.networking import port
 
 
 @utils.operation
@@ -149,55 +150,29 @@ async def unlink_subnet(source, target, inputs):
 
 @utils.operation
 async def port_create(node, inputs):
-    if 'network_id' not in node.runtime_properties:
-        raise Exception('Unable to create subnet for node "{0}". '
-                        'It is necessary to use relationship '
-                        'to link subnet to network.'.format(node.name))
+
+    node.context.logger.info(
+        '[{0}] - Attempting to create subnet port.'
+        .format(node.name))
+
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        name_or_id = node.properties['name_or_id']
-        network_id = node.runtime_properties['network_id']
-        admit_state_up = True
-        subnet_id = node.runtime_properties['subnet_id']
-        node.context.logger.info('[{0}] - Attempting to create port at '
-                                 'subnet "{1}" of network "{2}".'
-                                 .format(node.name,
-                                         subnet_id,
-                                         network_id))
-        port_dict = {
-            'port': {
-                'admin_state_up': admit_state_up,
-                'name': name_or_id,
-                'network_id': network_id,
-                'fixed_ips': [
-                    {
-                        'subnet_id': subnet_id
-                    }
-                ]
+    name_or_id = node.properties['name_or_id']
+    network_id = node.runtime_properties.get('network_id')
+    admit_state_up = True
+    subnet_id = node.runtime_properties.get('subnet_id')
+    security_groups = node.runtime_properties.get('security_groups')
+    use_existing = node.properties['use_existing']
 
-            }
-        }
+    _port = await port.create(node.context, name_or_id, neutron,
+                              network_id, subnet_id,
+                              admin_state_up=admit_state_up,
+                              security_groups=security_groups,
+                              use_existing=use_existing)
 
-        if 'security_groups' in node.runtime_properties:
-            port_dict['port']['security_groups'] = (
-                node.runtime_properties['security_groups'])
+    fixed_ips = _port['fixed_ips'].pop()
+    node.batch_update_runtime_properties(**fixed_ips)
 
-        port = neutron.create_port(body=port_dict)['port']
-        node.context.logger.info(
-            '[{0}] - Port at subnet "{1}" of network "{2}".'
-            .format(node.name,
-                    subnet_id,
-                    network_id))
-    else:
-        node.context.logger.info('[{0}] - Using existing port "{1}".'
-                                 .format(node.name,
-                                         node.properties['name_or_id']))
-        port = neutron.show_port(node.properties['name_or_id'])['port']
-    for k, v in port.items():
-        if k == 'fixed_ips':
-            ip_and_subnet = port[k].pop()
-            node.batch_update_runtime_properties(**ip_and_subnet)
-    node.batch_update_runtime_properties(**port)
+    node.batch_update_runtime_properties(**_port)
     node.context.logger.info(
         '[{0}] - Port created for subnet "{1}".'
         .format(node.name, node.runtime_properties['subnet_id']))
@@ -208,26 +183,13 @@ async def port_delete(node, inputs):
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     neutron = clients.openstack.neutron(node)
-    if not node.properties['use_existing']:
-        id = node.get_attribute('id')
-        neutron.delete_port(id)
+    use_existing = node.properties['use_existing']
+    name_or_id = node.get_attribute('id')
 
-        async def is_gone():
-            try:
-                neutron.show_port(id)
-                return False
-            except Exception as ex:
-                node.context.logger.debug(str(ex))
-                return True
-
-        await utils.retry(is_gone, exceptions=(Exception, ),
-                          task_retries=task_retries,
-                          task_retry_interval=task_retry_interval)
-    else:
-        node.context.logger.info(
-            '[{0}] - Leaving port "{1}" as is, '
-            'because of it is external resource.'
-            .format(node.name, node.get_attribute('id')))
+    await port.delete(node.context, name_or_id, neutron,
+                      use_existing=use_existing,
+                      task_retry_interval=task_retry_interval,
+                      task_retries=task_retries)
 
 
 @utils.operation

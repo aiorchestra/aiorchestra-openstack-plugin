@@ -1,4 +1,4 @@
-aiorchestra==0.1.1
+aiorchestra==0.1.2
 python-novaclient
 python-glanceclient
 python-neutronclient

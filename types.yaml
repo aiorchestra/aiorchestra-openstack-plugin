@@ -241,6 +241,21 @@ node_types:
             task_retries: 30
             task_retry_interval: 10
 
+  tosca.openstack.compute_instance.file:
+    derived_from: tosca.openstack.node
+    properties:
+      local_file_path:
+        type: string
+        required: true
+      remote_file_path:
+        type: string
+        required: true
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.orchestration.compute:setup_injection
+
 ##################################################################################################
 # OpenStack Network
 ##################################################################################################
@@ -610,6 +625,20 @@ node_types:
 ##################################################################################################
 # OpenStack relationships
 ##################################################################################################
+
+  tosca.openstack.compute.inject_file_to_compute_instance:
+    derived_from: tosca.openstack.relationships.node
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.orchestration.compute:inject_file
+          inputs:
+            type: map
+        unlink:
+          implementation: openstack_plugin.orchestration.compute:eject_file
+          inputs:
+            type: map
 
   tosca.openstack.networking.security_groups_rule_connected_to_security_group:
     derived_from: tosca.openstack.relationships.node

@@ -12,8 +12,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import getpass
 import os
 
+path = os.path.join(
+        os.path.dirname(
+            os.path.abspath(__file__)), '../../../examples')
 
 CONFIG = {
     # auth related
@@ -74,4 +78,9 @@ CONFIG = {
     'outbound_port_name': 'compute-outbound-port',
     'security_group_name_or_id': 'demo',
     'security_group_description': 'demo',
+    'install_script': os.path.join(path, 'scripts', 'check_injection.sh'),
+    'local_file_path_for_injection': os.path.join(path, 'injection', 'file'),
+    'remote_file_path_for_injection': '/tmp/file',
+    'username': os.environ.get('USERNAME', getpass.getuser()),
+    'ssh_port': os.environ.get('SSH_PORT', 22),
 }

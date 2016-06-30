@@ -9,8 +9,7 @@ description: Router with Ext net and two internal networks
 
 imports:
 
-  - ../types.yaml
-#  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/master/types.yaml
+  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/0.1.2-stable/types.yaml
 
 topology_template:
 #####################################################################

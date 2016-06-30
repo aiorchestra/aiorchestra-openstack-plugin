@@ -9,8 +9,7 @@ description: Attempts to authorize to OpenStack
 
 imports:
 
-  - ../types.yaml
-#  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/master/types.yaml
+  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/0.1.2-stable/types.yaml
 
 topology_template:
 #####################################################################

@@ -31,13 +31,25 @@ class TestCompute(base.BaseAIOrchestraOpenStackTestCase):
     def test_ssh_keypair_template(self, context):
         pass
 
-    @aiorchestra.with_deployed('orchestra-compute-node.yaml',
+    @aiorchestra.with_deployed('orchestra-openstack-compute.yaml',
                                inputs=config.CONFIG)
     def test_compute_deploy(self, context):
         pass
 
-    @aiorchestra.with_deployed('orchestra-compute-node-'
-                               'with-ssh-keypair.yaml',
+    @aiorchestra.with_deployed('orchestra-openstack-compute-with-ssh.yaml',
                                inputs=config.CONFIG)
     def test_compute_with_ssh_deploy(self, context):
+        pass
+
+    @aiorchestra.with_deployed('orchestra-openstack-compute-'
+                               'with-file-injection.yaml',
+                               inputs=config.CONFIG)
+    def test_compute_with_injections_capability(self, context):
+        pass
+
+    @aiorchestra.with_deployed(
+        'orchestra-openstack-compute-'
+        'with-file-injection-alternative.yaml',
+        inputs=config.CONFIG)
+    def test_compute_with_injections_node(self, context):
         pass

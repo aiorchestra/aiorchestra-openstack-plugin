@@ -1,6 +1,6 @@
 tosca_definitions_version: tosca_simple_yaml_1_0
 
-description: Attempts to create compute resource
+description: Attempts to authorize
 
 
 #####################################################################
@@ -10,7 +10,6 @@ description: Attempts to create compute resource
 imports:
 
   - ../types.yaml
-#  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/master/types.yaml
 
 topology_template:
 #####################################################################
@@ -21,23 +20,18 @@ topology_template:
 
     keystone_username:
       type: string
-      default: ''
 
     keystone_password:
       type: string
-      default: ''
 
     keystone_project_name:
       type: string
-      default: ''
 
     keystone_url:
       type: string
-      default: ''
 
     openstack_region:
       type: string
-      default: ''
 
 #####################################################################
 # Node templates
@@ -45,8 +39,8 @@ topology_template:
 
   node_templates:
 
-    authorization_form:
-      type: tosca.openstack.authorization_form
+    aiorchestra.openstack.authorization:
+      type: tosca.nodes.openstack.authorization
       properties:
         username: { get_input: keystone_username }
         password: { get_input: keystone_password }
@@ -56,6 +50,6 @@ topology_template:
 
   outputs:
     auth_token:
-      value: { get_attribute: [ authorization_form, auth_token ] }
-    auth_url:
-      value: { get_property: [ authorization_form, auth_url ] }
+      value: { get_attribute: [ aiorchestra.openstack.authorization, auth_token ] }
+    auth_properties:
+      value: { get_attribute: [ aiorchestra.openstack.authorization, auth_properties ] }

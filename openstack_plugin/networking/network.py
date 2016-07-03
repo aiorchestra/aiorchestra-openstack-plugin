@@ -48,7 +48,7 @@ async def create(context,
             net_details = net['network']
             if not net_details['router:external']:
                 raise Exception(
-                    'Network "{0}" is not an external. Details: {1}.'
+                    'Network "{0}" is not an external. Details: {1}'
                     .format(net_details['id'], str(net_details)))
 
     return net['network']

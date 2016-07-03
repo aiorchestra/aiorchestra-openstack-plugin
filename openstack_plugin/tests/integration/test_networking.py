@@ -31,14 +31,18 @@ class TestNetworking(base.BaseAIOrchestraOpenStackTestCase):
     def test_network(self, context):
         pass
 
-    @aiorchestra.with_deployed('orchestra-openstack-network-'
-                               'with-subnet.yaml',
+    @aiorchestra.with_deployed('orchestra-openstack-network-subnet.yaml',
                                inputs=config.CONFIG)
     def test_subnet(self, context):
         pass
 
+    @aiorchestra.with_deployed('orchestra-openstack-network-port.yaml',
+                               inputs=config.CONFIG)
+    def test_network_port(self, context):
+        pass
+
     @aiorchestra.with_deployed('orchestra-openstack-network-'
-                               'with-subnet-and-port.yaml',
+                               'subnet-port.yaml',
                                inputs=config.CONFIG)
     def test_subnet_port(self, context):
         pass
@@ -48,22 +52,9 @@ class TestNetworking(base.BaseAIOrchestraOpenStackTestCase):
     def test_router(self, context):
         pass
 
-    @aiorchestra.with_deployed('orchestra-openstack-router-'
-                               'networks-subnets.yaml',
+    @aiorchestra.with_deployed('orchestra-openstack-floating-ip.yaml',
                                inputs=config.CONFIG)
-    def test_router_with_two_subnets(self, context):
-        pass
-
-    @aiorchestra.with_deployed('orchestra-openstack-router-with-ext-net-'
-                               'and-internal-networks-subnets.yaml',
-                               inputs=config.CONFIG)
-    def test_router_with_ext_net_and_two_subnets(self, context):
-        pass
-
-    @aiorchestra.with_deployed('orchestra-openstack-router-with-ext-net-'
-                               'fip-and-internal-networks-subnets-ports.yaml',
-                               inputs=config.CONFIG)
-    def test_ext_net_fip_router_network_subnet_port(self, context):
+    def test_floating_ip(self, context):
         pass
 
     @aiorchestra.with_deployed('orchestra-openstack-security-group.yaml',
@@ -71,9 +62,8 @@ class TestNetworking(base.BaseAIOrchestraOpenStackTestCase):
     def test_security_group(self, context):
         pass
 
-    @aiorchestra.with_deployed('orchestra-openstack-router-with-ext-net-'
-                               'fip-and-internal-networks-'
-                               'subnets-ports-and-sg.yaml',
+    @aiorchestra.with_deployed('orchestra-openstack-network-'
+                               'subnet-port-sgs.yaml',
                                inputs=config.CONFIG)
-    def test_ext_net_fip_router_network_subnet_port_sg(self, context):
+    def test_port_with_security_group(self, context):
         pass

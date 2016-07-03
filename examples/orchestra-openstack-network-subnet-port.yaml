@@ -1,6 +1,6 @@
 tosca_definitions_version: tosca_simple_yaml_1_0
 
-description: Router
+description: network subnet port
 
 
 #####################################################################
@@ -33,10 +33,32 @@ topology_template:
     openstack_region:
       type: string
 
-    router_name:
+    network_name:
       type: string
 
-    external_network_id:
+    subnet_ip_version:
+      type: integer
+      default: 4
+
+    subnet_name:
+      type: string
+
+    subnet_cidr:
+      type: string
+
+    subnet_pool_start_ip:
+      type: string
+
+    subnet_pool_end_ip:
+      type: string
+
+    subnet_gateway_ip:
+      type: string
+
+    subnet_dns_nameserver:
+      type: list
+
+    network_subnet_port_name:
       type: string
 
 #####################################################################
@@ -54,29 +76,49 @@ topology_template:
         auth_url:  { get_input: keystone_url }
         region_name:  { get_input: openstack_region }
 
-    aiorchestra.openstack.network.external:
+    aiorchestra.openstack.network:
       type: tosca.nodes.openstack.network
       properties:
-        is_external: true
-        network_id: { get_input: external_network_id }
+        network_name: { get_input: network_name }
       requirements:
         - auth:
             capability: tosca.capabilities.openstack.auth.attachable
             node: aiorchestra.openstack.authorization
             relationship: tosca.relationships.openstack.inject_auth
 
-    aiorchestra.openstack.network.router:
-      type: tosca.nodes.openstack.network.router
+    aiorchestra.openstack.network.subnet:
+      type: tosca.nodes.openstack.network.subnet
       properties:
-        router_name: { get_input: router_name }
+        ip_version: { get_input: subnet_ip_version }
+        cidr: { get_input: subnet_cidr }
+        start_ip: { get_input: subnet_pool_start_ip }
+        end_ip: { get_input: subnet_pool_end_ip }
+        gateway_ip: { get_input: subnet_gateway_ip }
+        network_name: { get_input: subnet_name }
+        dns_nameservers: { get_input: subnet_dns_nameserver }
       requirements:
         - auth:
             capability: tosca.capabilities.openstack.auth.attachable
             node: aiorchestra.openstack.authorization
             relationship: tosca.relationships.openstack.inject_auth
-        - link: aiorchestra.openstack.network.external
+        - link: aiorchestra.openstack.network
+
+    aiorchestra.openstack.network.port:
+      type: tosca.nodes.openstack.network.port
+      properties:
+        port_name: { get_input: network_subnet_port_name }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - link: aiorchestra.openstack.network.subnet
 
 
   outputs:
-    router_id:
-      value: { get_attribute: [aiorchestra.openstack.network.router, router_id] }
+    network_id:
+      value: { get_attribute: [ aiorchestra.openstack.network, network_id ] }
+    subnet_id:
+      value: { get_attribute: [ aiorchestra.openstack.network.subnet, network_id ] }
+    port_address:
+      value: { get_attribute: [ aiorchestra.openstack.network.port, ip_address ] }

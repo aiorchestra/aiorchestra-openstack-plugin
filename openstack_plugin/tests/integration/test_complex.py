@@ -26,40 +26,52 @@ class TestComplex(base.BaseAIOrchestraOpenStackTestCase):
     def tearDown(self):
         super(TestComplex, self).tearDown()
 
-    @aiorchestra.with_deployed('orchestra-openstack-compute-and-router-'
-                               'with-ext-net-and-internal-'
-                               'networks-subnets.yaml',
-                               inputs=config.CONFIG)
-    def test_compute_and_router_with_ext_net_and_two_subnets(
-            self, context):
-        pass
-
-    @aiorchestra.with_deployed('orchestra-openstack-two-'
-                               'computes-and-router-'
-                               'with-ext-net-and-internal-'
-                               'networks-subnets.yaml',
-                               inputs=config.CONFIG)
-    def test_two_compute_and_router_with_ext_net_and_two_subnets(
-            self, context):
-        pass
-
     @aiorchestra.with_deployed('orchestra-openstack-compute-'
-                               'and-router-with-'
-                               'ext-net-fip-and-internal-networks-'
-                               'subnets.yaml',
+                               'with-floating-ip.yaml',
                                inputs=config.CONFIG)
-    def test_two_compute_and_router_with_ext_net_fip_and_two_subnets(
+    def test_compute_with_floating_ip(self, context):
+        pass
+
+    @aiorchestra.with_deployed('orchestra-openstack-network-subnet-'
+                               'port-attached-to-compute-with-sgs.yaml',
+                               inputs=config.CONFIG)
+    def test_compute_with_port_and_security_group(self, context):
+        pass
+
+    @aiorchestra.with_deployed('orchestra-openstack-network-'
+                               'subnet-port-attached-to-compute.yaml',
+                               inputs=config.CONFIG)
+    def test_network_subnet_and_port_to_compute(self, context):
+        pass
+
+    @aiorchestra.with_deployed(
+        'orchestra-openstack-network-subnet-'
+        'router-two-ports-attached-to-compute.yaml',
+        inputs=config.CONFIG)
+    def test_ext_net_router_network_subnet_and_two_ports_to_compute(
             self, context):
         pass
 
-    @aiorchestra.with_deployed('orchestra-openstack-'
-                               'vrouter-base.yaml',
+    @aiorchestra.with_deployed(
+        'orchestra-openstack-network-subnet-'
+        'two-ports-attached-to-compute.yaml',
+        inputs=config.CONFIG)
+    def test_network_subnet_and_two_ports_to_compute(self, context):
+        pass
+
+    @aiorchestra.with_deployed('orchestra-openstack-vrouter-base.yaml',
                                inputs=config.CONFIG)
     def test_vrouter_base(self, context):
         pass
 
-    @aiorchestra.with_deployed('orchestra-openstack-vrouter-base-'
-                               'with-two-computes-attached.yaml',
+    @aiorchestra.with_deployed('orchestra-openstack-vrouter-'
+                               'base-with-two-computes.yaml',
                                inputs=config.CONFIG)
-    def test_vrouter_base_with_two_computes_attached(self, context):
+    def test_vrouter_base_with_two_computes(self, context):
+        pass
+
+    @aiorchestra.with_deployed('orchestra-openstack-vrouter-'
+                               'base-with-external-access.yaml',
+                               inputs=config.CONFIG)
+    def test_vrouter_base_with_external_access(self, context):
         pass

@@ -1,6 +1,6 @@
 tosca_definitions_version: tosca_simple_yaml_1_0
 
-description: network
+description: compute with SSH
 
 
 #####################################################################
@@ -33,7 +33,16 @@ topology_template:
     openstack_region:
       type: string
 
-    network_name:
+    compute_name:
+      type: string
+
+    compute_image:
+      type: string
+
+    compute_flavor:
+      type: string
+
+    ssh_keypair_name:
       type: string
 
 #####################################################################
@@ -51,20 +60,43 @@ topology_template:
         auth_url:  { get_input: keystone_url }
         region_name:  { get_input: openstack_region }
 
-    aiorchestra.openstack.network:
-      type: tosca.nodes.openstack.network
+    aiorchestra.openstack.keypair:
+      type: tosca.nodes.openstack.ssh_keypair
       properties:
-        network_name: { get_input: network_name }
+        name: { get_input: ssh_keypair_name }
       requirements:
         - auth:
             capability: tosca.capabilities.openstack.auth.attachable
             node: aiorchestra.openstack.authorization
             relationship: tosca.relationships.openstack.inject_auth
 
+    aiorchestra.openstack.compute:
+      type: tosca.nodes.openstack.compute
+      properties:
+        compute_name: { get_input: compute_name }
+      capabilities:
+        host:
+          properties:
+            flavor: { get_input: compute_flavor}
+      artifacts:
+        image_ref:
+          type: tosca.artifacts.openstack.image
+          id: { get_input: compute_image }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - ssh:
+            node: aiorchestra.openstack.keypair
+            relationship: tosca.relationships.openstack.ssh_keypair_provider
+
   outputs:
-    network_id:
-      value: { get_attribute: [ aiorchestra.openstack.network, network_id ] }
-    subnets:
-      value: { get_attribute: [ aiorchestra.openstack.network, subnets ] }
-    network_id:
-      value: { get_attribute: [ aiorchestra.openstack.network, network_name ] }
+    auth_token:
+      value: { get_attribute: [aiorchestra.openstack.authorization, auth_token ] }
+    server:
+      value: { get_attribute: [aiorchestra.openstack.compute, id] }
+    ssh_pubic:
+      value: { get_attribute: [aiorchestra.openstack.keypair, public_key] }
+    ssh_private:
+      value: { get_attribute: [aiorchestra.openstack.keypair, private_key_content] }

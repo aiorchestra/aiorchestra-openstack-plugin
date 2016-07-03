@@ -115,6 +115,9 @@ topology_template:
 
     compute_flavor:
       type: string
+
+    ssh_keypair_name:
+      type: string
 ########################################
     router_name:
       type: string
@@ -267,6 +270,10 @@ topology_template:
             node: aiorchestra.openstack.authorization
             relationship: tosca.relationships.openstack.inject_auth
         - link: aiorchestra.openstack.network.subnet.mgmt
+        - security_groups:
+            capability: tosca.capabilities.openstack.network.port.security_group.attachable
+            node: aiorchestra.openstack.network.port.security_group
+            relationship: tosca.relationships.openstack.network.port.security_group.attached
 
     aiorchestra.openstack.network.port.inbound:
       type: tosca.nodes.openstack.network.port
@@ -289,6 +296,73 @@ topology_template:
             node: aiorchestra.openstack.authorization
             relationship: tosca.relationships.openstack.inject_auth
         - link: aiorchestra.openstack.network.subnet.outbound
+
+########################################################################################
+########################################################################################
+
+    aiorchestra.openstack.network.port.security_group.ingress:
+      type: tosca.nodes.openstack.network.port.security_group.rule
+      properties:
+        direction: 'ingress'
+        ethertype: 'IPv4'
+        port_range_min: 1
+        port_range_max: 65535
+        protocol: 'tcp'
+        remote_ip_prefix: '0.0.0.0/0'
+
+    aiorchestra.openstack.network.port.security_group.egress:
+      type: tosca.nodes.openstack.network.port.security_group.rule
+      properties:
+        direction: 'egress'
+        ethertype: 'IPv4'
+        port_range_min: 1
+        port_range_max: 65535
+        protocol: 'tcp'
+        remote_ip_prefix: '0.0.0.0/0'
+
+    aiorchestra.openstack.network.port.security_group:
+      type: tosca.nodes.openstack.network.port.security_group
+      properties:
+        security_group_name: { get_input: mgmt_network_subnet_port }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - egress:
+            capability: tosca.capabilities.openstack.network.port.security_group.rule.attachable
+            node: aiorchestra.openstack.network.port.security_group.egress
+            relationship: tosca.relationships.openstack.network.port.security_group.rule
+        - ingress:
+            capability: tosca.capabilities.openstack.network.port.security_group.rule.attachable
+            node: aiorchestra.openstack.network.port.security_group.ingress
+            relationship: tosca.relationships.openstack.network.port.security_group.rule
+
+########################################################################################
+########################################################################################
+
+    aiorchestra.openstack.network.floating_ip:
+      type: tosca.nodes.openstack.network.floating_ip
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - link: aiorchestra.openstack.network.external
+        - binding: aiorchestra.openstack.network.port.mgmt
+
+########################################################################################
+########################################################################################
+
+    aiorchestra.openstack.keypair:
+      type: tosca.nodes.openstack.ssh_keypair
+      properties:
+        name: { get_input: ssh_keypair_name }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
 
 ########################################################################################
 ########################################################################################
@@ -322,6 +396,10 @@ topology_template:
             capability: tosca.capabilities.network.Bindable
             node: aiorchestra.openstack.network.port.outbound
             relationship: tosca.relationships.openstack.compute.port.bind
+        - ssh:
+            capability: tosca.capabilities.openstack.compute.ssh.attachable
+            node: aiorchestra.openstack.keypair
+            relationship: tosca.relationships.openstack.ssh_keypair_provider
 
 ########################################################################################
 ########################################################################################
@@ -331,3 +409,9 @@ topology_template:
       value: { get_attribute: [ aiorchestra.openstack.network.port.inbound, ip_address ] }
     outbound_port_address:
       value: { get_attribute: [ aiorchestra.openstack.network.port.outbound, ip_address ] }
+    mgmt_port_address:
+      value: { get_attribute: [ aiorchestra.openstack.network.port.mgmt, ip_address ] }
+    ssh_pubic:
+      value: { get_attribute: [aiorchestra.openstack.keypair, public_key] }
+    ssh_private:
+      value: { get_attribute: [aiorchestra.openstack.keypair, private_key_content] }

@@ -1,6 +1,6 @@
 tosca_definitions_version: tosca_simple_yaml_1_0
 
-description: network
+description: network and subnet
 
 
 #####################################################################
@@ -36,6 +36,28 @@ topology_template:
     network_name:
       type: string
 
+    subnet_ip_version:
+      type: integer
+      default: 4
+
+    subnet_name:
+      type: string
+
+    subnet_cidr:
+      type: string
+
+    subnet_pool_start_ip:
+      type: string
+
+    subnet_pool_end_ip:
+      type: string
+
+    subnet_gateway_ip:
+      type: string
+
+    subnet_dns_nameserver:
+      type: list
+
 #####################################################################
 # Node templates
 #####################################################################
@@ -60,6 +82,24 @@ topology_template:
             capability: tosca.capabilities.openstack.auth.attachable
             node: aiorchestra.openstack.authorization
             relationship: tosca.relationships.openstack.inject_auth
+
+    aiorchestra.openstack.network.subnet:
+      type: tosca.nodes.openstack.network.subnet
+      properties:
+        ip_version: { get_input: subnet_ip_version }
+        cidr: { get_input: subnet_cidr }
+        start_ip: { get_input: subnet_pool_start_ip }
+        end_ip: { get_input: subnet_pool_end_ip }
+        gateway_ip: { get_input: subnet_gateway_ip }
+        network_name: { get_input: subnet_name }
+        dns_nameservers: { get_input: subnet_dns_nameserver }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - link: aiorchestra.openstack.network
+
 
   outputs:
     network_id:

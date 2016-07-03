@@ -1,6 +1,6 @@
 tosca_definitions_version: tosca_simple_yaml_1_0
 
-description: Security Group
+description: network subnet port
 
 
 #####################################################################
@@ -33,6 +33,34 @@ topology_template:
     openstack_region:
       type: string
 
+    network_name:
+      type: string
+
+    subnet_ip_version:
+      type: integer
+      default: 4
+
+    subnet_name:
+      type: string
+
+    subnet_cidr:
+      type: string
+
+    subnet_pool_start_ip:
+      type: string
+
+    subnet_pool_end_ip:
+      type: string
+
+    subnet_gateway_ip:
+      type: string
+
+    subnet_dns_nameserver:
+      type: list
+
+    network_subnet_port_name:
+      type: string
+
 #####################################################################
 # Node templates
 #####################################################################
@@ -47,6 +75,48 @@ topology_template:
         project_name:  { get_input: keystone_project_name }
         auth_url:  { get_input: keystone_url }
         region_name:  { get_input: openstack_region }
+
+    aiorchestra.openstack.network:
+      type: tosca.nodes.openstack.network
+      properties:
+        network_name: { get_input: network_name }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+
+    aiorchestra.openstack.network.subnet:
+      type: tosca.nodes.openstack.network.subnet
+      properties:
+        ip_version: { get_input: subnet_ip_version }
+        cidr: { get_input: subnet_cidr }
+        start_ip: { get_input: subnet_pool_start_ip }
+        end_ip: { get_input: subnet_pool_end_ip }
+        gateway_ip: { get_input: subnet_gateway_ip }
+        network_name: { get_input: subnet_name }
+        dns_nameservers: { get_input: subnet_dns_nameserver }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - link: aiorchestra.openstack.network
+
+    aiorchestra.openstack.network.port:
+      type: tosca.nodes.openstack.network.port
+      properties:
+        port_name: { get_input: network_subnet_port_name }
+      requirements:
+        - link: aiorchestra.openstack.network.subnet
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - security_groups:
+            capability: tosca.capabilities.openstack.network.port.security_group.attachable
+            node: aiorchestra.openstack.network.port.security_group
+            relationship: tosca.relationships.openstack.network.port.security_group.attached
 
     aiorchestra.openstack.network.port.security_group.ingress:
       type: tosca.nodes.openstack.network.port.security_group.rule
@@ -71,8 +141,7 @@ topology_template:
     aiorchestra.openstack.network.port.security_group:
       type: tosca.nodes.openstack.network.port.security_group
       properties:
-        security_group_name: 'test'
-        description: 'test'
+        security_group_name: { get_input: network_subnet_port_name }
       requirements:
         - auth:
             capability: tosca.capabilities.openstack.auth.attachable
@@ -86,3 +155,12 @@ topology_template:
             capability: tosca.capabilities.openstack.network.port.security_group.rule.attachable
             node: aiorchestra.openstack.network.port.security_group.ingress
             relationship: tosca.relationships.openstack.network.port.security_group.rule
+
+
+  outputs:
+    network_id:
+      value: { get_attribute: [ aiorchestra.openstack.network, network_id ] }
+    subnet_id:
+      value: { get_attribute: [ aiorchestra.openstack.network.subnet, network_id ] }
+    port_address:
+      value: { get_attribute: [ aiorchestra.openstack.network.port, ip_address ] }

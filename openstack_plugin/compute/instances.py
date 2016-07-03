@@ -52,7 +52,7 @@ async def create(context, novaclient, glanceclient, name_or_id, flavor,
             key_name=ssh_keyname,
             nics=nics, files=files,
             config_drive=config_drive)
-        context.logger.info('Compute instance "{0}"created.'
+        context.logger.info('Compute instance "{0}" created.'
                             .format(name_or_id))
     else:
         instance = novaclient.servers.get(name_or_id)
@@ -96,11 +96,10 @@ async def start(context, novaclient, name_or_id,
                 server_task_state == SERVER_TASK_STATE_POWERING_ON):
             return False
 
-    context.logger.info('Starting status polling for '
-                        'compute instance.'.format(name_or_id))
     await utils.retry(wait_until_active, exceptions=(Exception,),
                       task_retries=task_retries,
                       task_retry_interval=task_retry_interval)
+    context.logger.info('Compute instance started.'.format(name_or_id))
 
 
 async def delete(context, novaclient, name_or_id,

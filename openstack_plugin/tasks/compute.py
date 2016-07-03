@@ -25,41 +25,72 @@ async def create(node, inputs):
     nova = clients.openstack.nova(node)
     glance = clients.openstack.glance(node)
 
-    (name_or_id, flavor, image, config_drive,
-     use_existing, files, ssh_key, nics) = (
-        node.properties['name_or_id'],
-        node.properties['flavor'],
-        node.properties['image'],
+    host_cap = node.get_capability('host')
+    if not host_cap:
+        raise Exception('[{0}] - Unable to get host.flavor '
+                        'capability.'.format(node.name))
+    image_artifact = node.get_artifact_by_name('image_ref')
+    if not image_artifact:
+        raise Exception('[{0}] - Unable to get image '
+                        'node artifact.'.format(node.name))
+
+    file_injection_artifacts = setup_injections_from_artifacts(
+        node.get_artifact_from_type(
+            'tosca.artifacts.openstack.compute.injection_file'))
+
+    # in case if file injection was done using dedicated node
+    files = node.runtime_properties.get('injections', {})
+    files.update(file_injection_artifacts)
+
+    flavor = host_cap['flavor']
+    image = image_artifact['id']
+
+    (compute_name, compute_id, config_drive, ssh_key, nics) = (
+        node.properties['compute_name'],
+        node.properties.get('compute_id'),
         node.properties.get('config_drive'),
-        node.properties['use_existing'],
-        node.runtime_properties.get('injections', {}),
         node.runtime_properties.get(
             'ssh_keypair', {'name': None})['name'],
-        node.runtime_properties.get('nics', None)
+        node.runtime_properties.get('nics', [])
     )
+
+    identifier = compute_name if not compute_id else compute_id
 
     instance = await instances.create(
         node.context, nova, glance,
-        name_or_id, flavor, image,
+        identifier, flavor, image,
         ssh_keyname=ssh_key, nics=nics,
         config_drive=config_drive,
-        use_existing=use_existing,
+        use_existing=True if compute_id else False,
         files=files,
     )
 
+    networks = [port['net-id'] for port in nics]
     node.batch_update_runtime_properties(**{
         'id': instance.id,
         'server': instance.__dict__,
         'status': instance.status,
+        'networks': networks,
+        'ports': nics,
     })
+
+
+def setup_injections_from_artifacts(injection_artifacts):
+    mapping = {}
+    for artifact in injection_artifacts:
+        source = artifact['source']
+        destination = artifact['destination']
+        with open(source, 'r') as s:
+            mapping[destination] = s.read()
+    return mapping
 
 
 @utils.operation
 async def setup_injection(node, inputs):
     node.context.logger.info('[{0}] - Setting up file injection.'
                              .format(node.name))
-    local_file = node.properties['local_file_path']
-    remote_file_path = node.properties['remote_file_path']
+    local_file = node.properties['source']
+    remote_file_path = node.properties['destination']
     with open(local_file, 'r') as injection:
         local_file_content = injection.read()
         node.update_runtime_properties(
@@ -90,9 +121,10 @@ async def start(node, inputs):
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     nova = clients.openstack.nova(node)
-    use_existing = node.properties['use_existing']
+    use_existing = True if node.properties.get('compute_id') else False
     name_or_id = node.runtime_properties['server']['id']
-
+    node.context.logger.info('[{0}] - Attempting to start '
+                             'compute instance.'.format(node.name))
     await instances.start(
         node.context, nova, name_or_id,
         use_existing=use_existing,
@@ -107,7 +139,7 @@ async def delete(node, inputs):
                              'instance.'.format(node.name))
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
-    use_existing = node.properties['use_existing']
+    use_existing = True if node.properties.get('compute_id') else False
     name_or_id = node.runtime_properties['server']['id']
     nova = clients.openstack.nova(node)
 
@@ -116,7 +148,8 @@ async def delete(node, inputs):
                            task_retry_interval=task_retry_interval,
                            task_retries=task_retries)
 
-    for attr in ['id', 'server', 'status']:
+    for attr in ['id', 'server', 'status',
+                 'networks', 'ports']:
         if attr in node.runtime_properties:
             del node.runtime_properties[attr]
 
@@ -126,7 +159,7 @@ async def stop(node, inputs):
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     nova = clients.openstack.nova(node)
-    use_existing = node.properties['use_existing']
+    use_existing = True if node.properties.get('compute_id') else False
     name_or_id = node.runtime_properties['id']
 
     await instances.stop(node.context, nova, name_or_id,

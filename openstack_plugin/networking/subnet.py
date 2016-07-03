@@ -23,8 +23,9 @@ async def create(context,
                  cidr,
                  allocation_pools,
                  dns_nameservers,
+                 dhcp_enabled=True,
                  router_id=None,
-                 use_existing=False):
+                 use_existing=False,):
     """
     Creates subnet for given network
     :param context:
@@ -35,6 +36,7 @@ async def create(context,
     :param cidr:
     :param allocation_pools:
     :param dns_nameservers:
+    :param dhcp_enabled:
     :param router_id:
     :param use_existing:
     :return:
@@ -48,6 +50,7 @@ async def create(context,
                 'cidr': cidr,
                 'allocation_pools': allocation_pools,
                 'dns_nameservers': dns_nameservers,
+                'enable_dhcp': dhcp_enabled,
             }
         }
         subnet = neutronclient.create_subnet(body=subnet_body)

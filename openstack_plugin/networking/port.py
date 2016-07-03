@@ -15,9 +15,14 @@
 from aiorchestra.core import utils
 
 
-async def create(context, name_or_id, neutronclient,
-                 network_id, subnet_id, admin_state_up=True,
-                 security_groups=None, use_existing=False):
+async def create(context, name_or_id,
+                 neutronclient,
+                 network_id,
+                 subnet_id=None,
+                 ip_addresses=None,
+                 admin_state_up=True,
+                 security_groups=None,
+                 use_existing=False):
     """
     Creates port for specific subnet of network
     :param context:
@@ -25,26 +30,28 @@ async def create(context, name_or_id, neutronclient,
     :param neutronclient:
     :param network_id:
     :param subnet_id:
+    :param ip_addresses:
     :param admin_state_up:
     :param security_groups:
     :param use_existing:
     :return:
     """
+
     if not use_existing:
         port_dict = {
             'port': {
                 'admin_state_up': admin_state_up,
                 'name': name_or_id,
                 'network_id': network_id,
-                'fixed_ips': [
-                    {
-                        'subnet_id': subnet_id
-                    }
-                ]
-
             }
         }
-
+        fixed_ips = []
+        if subnet_id:
+            subnet = {'subnet_id': subnet_id}
+            if ip_addresses:
+                subnet.update({'ip_address': ip_addresses})
+            fixed_ips.append(subnet)
+            port_dict['port']['fixed_ips'] = fixed_ips
         if security_groups:
             port_dict['port']['security_groups'] = security_groups
 

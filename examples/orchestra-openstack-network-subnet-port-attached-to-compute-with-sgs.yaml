@@ -1,0 +1,194 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+
+description: network port subnet compute
+
+
+#####################################################################
+# Imports
+#####################################################################
+
+imports:
+
+  - ../types.yaml
+
+topology_template:
+#####################################################################
+# Inputs
+#####################################################################
+
+  inputs:
+
+    keystone_username:
+      type: string
+
+    keystone_password:
+      type: string
+
+    keystone_project_name:
+      type: string
+
+    keystone_url:
+      type: string
+
+    openstack_region:
+      type: string
+
+    network_name:
+      type: string
+
+    subnet_ip_version:
+      type: integer
+      default: 4
+
+    subnet_name:
+      type: string
+
+    subnet_cidr:
+      type: string
+
+    subnet_pool_start_ip:
+      type: string
+
+    subnet_pool_end_ip:
+      type: string
+
+    subnet_gateway_ip:
+      type: string
+
+    subnet_dns_nameserver:
+      type: list
+
+    network_subnet_port_name:
+      type: string
+
+    compute_name:
+      type: string
+
+    compute_image:
+      type: string
+
+    compute_flavor:
+      type: string
+
+#####################################################################
+# Node templates
+#####################################################################
+
+  node_templates:
+
+    aiorchestra.openstack.authorization:
+      type: tosca.nodes.openstack.authorization
+      properties:
+        username: { get_input: keystone_username }
+        password: { get_input: keystone_password }
+        project_name:  { get_input: keystone_project_name }
+        auth_url:  { get_input: keystone_url }
+        region_name:  { get_input: openstack_region }
+
+    aiorchestra.openstack.network:
+      type: tosca.nodes.openstack.network
+      properties:
+        network_name: { get_input: network_name }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+
+    aiorchestra.openstack.network.subnet:
+      type: tosca.nodes.openstack.network.subnet
+      properties:
+        ip_version: { get_input: subnet_ip_version }
+        cidr: { get_input: subnet_cidr }
+        start_ip: { get_input: subnet_pool_start_ip }
+        end_ip: { get_input: subnet_pool_end_ip }
+        gateway_ip: { get_input: subnet_gateway_ip }
+        network_name: { get_input: subnet_name }
+        dns_nameservers: { get_input: subnet_dns_nameserver }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - link: aiorchestra.openstack.network
+
+    aiorchestra.openstack.network.port:
+      type: tosca.nodes.openstack.network.port
+      properties:
+        port_name: { get_input: network_subnet_port_name }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - link: aiorchestra.openstack.network.subnet
+
+    aiorchestra.openstack.network.port.security_group.ingress:
+      type: tosca.nodes.openstack.network.port.security_group.rule
+      properties:
+        direction: 'ingress'
+        ethertype: 'IPv4'
+        port_range_min: 1
+        port_range_max: 65535
+        protocol: 'tcp'
+        remote_ip_prefix: '0.0.0.0/0'
+
+    aiorchestra.openstack.network.port.security_group.egress:
+      type: tosca.nodes.openstack.network.port.security_group.rule
+      properties:
+        direction: 'egress'
+        ethertype: 'IPv4'
+        port_range_min: 1
+        port_range_max: 65535
+        protocol: 'tcp'
+        remote_ip_prefix: '0.0.0.0/0'
+
+    aiorchestra.openstack.network.port.security_group:
+      type: tosca.nodes.openstack.network.port.security_group
+      properties:
+        security_group_name: { get_input: network_subnet_port_name }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - egress:
+            capability: tosca.capabilities.openstack.network.port.security_group.rule.attachable
+            node: aiorchestra.openstack.network.port.security_group.egress
+            relationship: tosca.relationships.openstack.network.port.security_group.rule
+        - ingress:
+            capability: tosca.capabilities.openstack.network.port.security_group.rule.attachable
+            node: aiorchestra.openstack.network.port.security_group.ingress
+            relationship: tosca.relationships.openstack.network.port.security_group.rule
+
+
+    aiorchestra.openstack.compute:
+      type: tosca.nodes.openstack.compute
+      properties:
+        compute_name: { get_input: compute_name }
+      capabilities:
+        host:
+          properties:
+            flavor: { get_input: compute_flavor}
+      artifacts:
+        image_ref:
+          type: tosca.artifacts.openstack.image
+          id: { get_input: compute_image }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - binding:
+            capability: tosca.capabilities.network.Bindable
+            node: aiorchestra.openstack.network.port
+            relationship: tosca.relationships.openstack.compute.port.bind
+
+
+  outputs:
+    network_id:
+      value: { get_attribute: [ aiorchestra.openstack.network, network_id ] }
+    subnet_id:
+      value: { get_attribute: [ aiorchestra.openstack.network.subnet, network_id ] }
+    port_address:
+      value: { get_attribute: [ aiorchestra.openstack.network.port, ip_address ] }

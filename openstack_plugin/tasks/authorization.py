@@ -33,7 +33,7 @@ async def authorize(node, inputs):
 @utils.operation
 async def inject(source, target, inputs):
     source.context.logger.info(
-        "[{0} -----> {1}] - Establishing relationship."
+        "[{0} -----> {1}] - Injecting auth properties."
         .format(target.name, source.name))
     for rAttr in [AUTH_PROPERTIES, TOKEN]:
         if rAttr in target.runtime_properties:
@@ -44,10 +44,8 @@ async def inject(source, target, inputs):
 @utils.operation
 async def eject(source, target, inputs):
     source.context.logger.info(
-        "[{0} --X--> {1}] - Breaking relationship."
+        "[{0} --X--> {1}] - Ejecting auth attributes."
         .format(target.name, source.name))
-    source.context.logger.info('Ejecting attributes from node "{0}".'
-                               .format(source.name))
     for rAttr in [AUTH_PROPERTIES, TOKEN]:
         if rAttr in source.runtime_properties:
             del source.runtime_properties[rAttr]

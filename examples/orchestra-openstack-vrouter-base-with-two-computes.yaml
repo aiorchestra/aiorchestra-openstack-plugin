@@ -1,6 +1,6 @@
 tosca_definitions_version: tosca_simple_yaml_1_0
 
-description: vRouter base
+description: vRouter base plus two computes for inbound/outbound networks
 
 
 #####################################################################
@@ -78,6 +78,9 @@ topology_template:
 
     inbound_network_name:
       type: string
+
+    inbound_network_subnet_port_one:
+      type: string
 ########################################
     outbound_subnet_name:
       type: string
@@ -99,6 +102,9 @@ topology_template:
 
     outbound_network_name:
       type: string
+
+    outbound_network_subnet_port_one:
+      type: string
 ########################################
     subnet_dns_nameserver:
       type: list
@@ -108,6 +114,12 @@ topology_template:
       default: 4
 ########################################
     compute_name:
+      type: string
+
+    compute_name_one:
+      type: string
+
+    compute_name_two:
       type: string
 
     compute_image:
@@ -290,6 +302,28 @@ topology_template:
             relationship: tosca.relationships.openstack.inject_auth
         - link: aiorchestra.openstack.network.subnet.outbound
 
+    aiorchestra.openstack.network.port.inbound.new:
+      type: tosca.nodes.openstack.network.port
+      properties:
+        port_name: { get_input: inbound_network_subnet_port_one }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - link: aiorchestra.openstack.network.subnet.inbound
+
+    aiorchestra.openstack.network.port.outbound.new:
+      type: tosca.nodes.openstack.network.port
+      properties:
+        port_name: { get_input: outbound_network_subnet_port_one }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - link: aiorchestra.openstack.network.subnet.outbound
+
 ########################################################################################
 ########################################################################################
 
@@ -326,8 +360,64 @@ topology_template:
 ########################################################################################
 ########################################################################################
 
+    aiorchestra.openstack.compute.one:
+      type: tosca.nodes.openstack.compute
+      properties:
+        compute_name: { get_input: compute_name_one }
+      capabilities:
+        host:
+          properties:
+            flavor: { get_input: compute_flavor}
+      artifacts:
+        image_ref:
+          type: tosca.artifacts.openstack.image
+          id: { get_input: compute_image }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - binding_inbound:
+            capability: tosca.capabilities.network.Bindable
+            node: aiorchestra.openstack.network.port.inbound.new
+            relationship: tosca.relationships.openstack.compute.port.bind
+
+########################################################################################
+########################################################################################
+
+    aiorchestra.openstack.compute.two:
+      type: tosca.nodes.openstack.compute
+      properties:
+        compute_name: { get_input: compute_name_two }
+      capabilities:
+        host:
+          properties:
+            flavor: { get_input: compute_flavor}
+      artifacts:
+        image_ref:
+          type: tosca.artifacts.openstack.image
+          id: { get_input: compute_image }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+        - binding_outbound:
+            capability: tosca.capabilities.network.Bindable
+            node: aiorchestra.openstack.network.port.outbound.new
+            relationship: tosca.relationships.openstack.compute.port.bind
+
+########################################################################################
+########################################################################################
+
   outputs:
     inbound_port_address:
       value: { get_attribute: [ aiorchestra.openstack.network.port.inbound, ip_address ] }
     outbound_port_address:
       value: { get_attribute: [ aiorchestra.openstack.network.port.outbound, ip_address ] }
+    mgmt_port_address:
+      value: { get_attribute: [ aiorchestra.openstack.network.port.mgmt, ip_address ] }
+    inbound_port_address_new:
+      value: { get_attribute: [ aiorchestra.openstack.network.port.inbound.new, ip_address ] }
+    outbound_port_address_new:
+      value: { get_attribute: [ aiorchestra.openstack.network.port.outbound.new, ip_address ] }

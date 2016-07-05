@@ -1,0 +1,98 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+
+description: comput with injections
+
+
+#####################################################################
+# Imports
+#####################################################################
+
+imports:
+
+  - ../types.yaml
+
+topology_template:
+#####################################################################
+# Inputs
+#####################################################################
+
+  inputs:
+
+    keystone_username:
+      type: string
+
+    keystone_password:
+      type: string
+
+    keystone_project_name:
+      type: string
+
+    keystone_url:
+      type: string
+
+    openstack_region:
+      type: string
+
+    compute_name:
+      type: string
+
+    compute_image:
+      type: string
+
+    compute_flavor:
+      type: string
+
+    local_file_path_for_injection:
+      type: string
+
+    remote_file_path_for_injection:
+      type: string
+
+    userdata_script_path:
+      type: string
+
+#####################################################################
+# Node templates
+#####################################################################
+
+  node_templates:
+
+    aiorchestra.openstack.authorization:
+      type: tosca.nodes.openstack.authorization
+      properties:
+        username: { get_input: keystone_username }
+        password: { get_input: keystone_password }
+        project_name:  { get_input: keystone_project_name }
+        auth_url:  { get_input: keystone_url }
+        region_name:  { get_input: openstack_region }
+
+    aiorchestra.openstack.compute:
+      type: tosca.nodes.openstack.compute
+      properties:
+        compute_name: { get_input: compute_name }
+      capabilities:
+        host:
+          properties:
+            flavor: { get_input: compute_flavor}
+      artifacts:
+        image_ref:
+          type: tosca.artifacts.openstack.image
+          id: { get_input: compute_image }
+        injection_one:
+          type: tosca.artifacts.openstack.compute.injection_file
+          source: { get_input: local_file_path_for_injection }
+          destination: { get_input: remote_file_path_for_injection }
+        userdata:
+          type: tosca.artifacts.openstack.compute.userdata
+          script: { get_input: userdata_script_path }
+      requirements:
+        - auth:
+            capability: tosca.capabilities.openstack.auth.attachable
+            node: aiorchestra.openstack.authorization
+            relationship: tosca.relationships.openstack.inject_auth
+
+  outputs:
+    auth_token:
+      value: { get_attribute: [aiorchestra.openstack.authorization, auth_token ] }
+    server:
+      value: { get_attribute: [aiorchestra.openstack.compute, id] }

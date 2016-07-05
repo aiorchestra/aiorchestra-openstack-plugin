@@ -79,4 +79,8 @@ CONFIG = {
     'remote_file_path_for_injection': '/tmp/file',
     'username': os.environ.get('USERNAME', getpass.getuser()),
     'ssh_port': os.environ.get('SSH_PORT', 22),
+    'userdata_script_path': os.path.join(path, 'userdata',
+                                         'docker-ubuntu-16-04.sh'),
+    'lb_algorithm': 'LEAST_CONNECTIONS',
+    'lb_protocol': 'TCP',
 }

@@ -42,6 +42,12 @@ class TestCompute(base.BaseAIOrchestraOpenStackTestCase):
         pass
 
     @aiorchestra.with_deployed('orchestra-openstack-compute-'
+                               'with-userdata.yaml',
+                               inputs=config.CONFIG)
+    def test_compute_with_userdata(self, context):
+        pass
+
+    @aiorchestra.with_deployed('orchestra-openstack-compute-'
                                'with-file-injection.yaml',
                                inputs=config.CONFIG)
     def test_compute_with_injections_capability(self, context):

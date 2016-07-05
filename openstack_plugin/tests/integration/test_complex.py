@@ -75,3 +75,8 @@ class TestComplex(base.BaseAIOrchestraOpenStackTestCase):
                                inputs=config.CONFIG)
     def test_vrouter_base_with_external_access(self, context):
         pass
+
+    @aiorchestra.with_deployed('orchestra-openstack-load-balancer.yaml',
+                               inputs=config.CONFIG)
+    def test_lbaas(self, context):
+        pass

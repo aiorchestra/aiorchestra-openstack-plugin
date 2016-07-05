@@ -23,7 +23,7 @@ SERVER_TASK_STATE_POWERING_ON = 'powering-on'
 
 async def create(context, novaclient, glanceclient, name_or_id, flavor,
                  image, ssh_keyname=None, nics=None, use_existing=False,
-                 files=None, config_drive=False):
+                 files=None, config_drive=False, userdata=None):
     """
     Creates compute instance
     :param context: OrchestraContext
@@ -51,7 +51,9 @@ async def create(context, novaclient, glanceclient, name_or_id, flavor,
             name_or_id, image, flavor,
             key_name=ssh_keyname,
             nics=nics, files=files,
-            config_drive=config_drive)
+            config_drive=config_drive,
+            userdata=userdata,
+        )
         context.logger.info('Compute instance "{0}" created.'
                             .format(name_or_id))
     else:

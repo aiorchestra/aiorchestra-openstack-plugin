@@ -544,7 +544,7 @@ node_types:
           node: tosca.nodes.openstack.network
           relationship: tosca.relationships.openstack.network.floating_ip
       - binding:
-          capability: tosca.capabilities.Node
+          capability: tosca.capabilities.Bindable
           node: tosca.nodes.openstack.network.port
           relationship: tosca.relationships.openstack.network.port.floating_ip
 
@@ -591,9 +591,13 @@ node_types:
       port_range_min:
         type: integer
         required: true
+        constraints:
+          - valid_values: [1, 65535]
       port_range_max:
         type: integer
         required: true
+        constraints:
+          - valid_values: [1, 65535]
       protocol:
         type: string
         constraints:
@@ -609,6 +613,46 @@ node_types:
           implementation: aiorchestra.core.noop:noop
         delete:
           implementation: aiorchestra.core.noop:noop
+
+##################################################################################################
+# OpenStack load balancer (LBaaS v2)
+##################################################################################################
+
+  tosca.nodes.openstack.network.load_balancer:
+    derived_from: tosca.nodes.Root
+    properties:
+      algorithm:
+        type: string
+        required: false
+      protocol:
+        type: string
+        required: false
+        default: 'tcp'
+      protocol_port:
+        type: integer
+        required: false
+        default: 80
+    capabilities:
+      client:
+        type: tosca.capabilities.openstack.network.load_balancer.endpoint
+    requirements:
+      - application:
+          capability: tosca.capabilities.openstack.network.load_balancer.member.endpoint
+          relationship: tosca.relationships.openstack.network.load_balancer.member
+          node: tosca.nodes.openstack.compute
+          occurrences: [0, UNBOUNDED]
+          description: Connection to one or more load balanced applications
+    interfaces:
+      Standard:
+        type: tosca.interfaces.node.lifecycle.Standard
+        create:
+          implementation: openstack_plugin.tasks.lbaas:create
+        start:
+          implementation: openstack_plugin.tasks.lbaas:start
+        stop:
+          implementation: openstack_plugin.tasks.lbaas:stop
+        delete:
+          implementation: openstack_plugin.tasks.lbaas:delete
 
 ##################################################################################################
 # OpenStack compute file injection
@@ -641,16 +685,16 @@ node_types:
 
   tosca.artifacts.openstack.compute.injection_file:
     derived_from: tosca.artifacts.Deployment.Image
-    description: Glance image artifact
+    description: Nova boot file injection
     source:
       type: string
     destination:
       type: string
 
-  tosca.artifacts.openstack.user_data:
+  tosca.artifacts.openstack.compute.userdata:
     derived_from: tosca.artifacts.Implementation.Bash
     description: Nova compute boot user data
-    file:
+    script:
       type: string
 
 ##################################################################################################
@@ -838,9 +882,38 @@ node_types:
         unlink:
           implementation: openstack_plugin.tasks.security_group:unlink_security_groups_from_port
 
+  tosca.relationships.openstack.network.load_balancer.member:
+    derived_from: tosca.relationships.Root
+    valid_target_types: [tosca.nodes.openstack.compute]
+    interfaces:
+      Configure:
+        type: tosca.interfaces.relationship.Configure
+        link:
+          implementation: openstack_plugin.tasks.lbaas:add_member
+          inputs:
+            network_id:
+              type: string
+        unlink:
+          implementation: openstack_plugin.tasks.lbaas:remove_member
+
 ##################################################################################################
 # OpenStack capabilities
 ##################################################################################################
+
+  tosca.capabilities.openstack.network.load_balancer.endpoint:
+    derived_from: tosca.capabilities.Endpoint.Public
+    properties:
+      network_id:
+        type: string
+
+  tosca.capabilities.openstack.network.load_balancer.member.endpoint:
+    derived_from: tosca.capabilities.Endpoint
+    properties:
+      weight:
+        type: integer
+        default: 1
+      ip_address:
+        type: integer
 
   tosca.capabilities.openstack.network.port.bindable:
     derived_from: tosca.capabilities.Node

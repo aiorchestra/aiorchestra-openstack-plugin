@@ -38,6 +38,13 @@ async def create(node, inputs):
         node.get_artifact_from_type(
             'tosca.artifacts.openstack.compute.injection_file'))
 
+    userdata = None
+    userdata_artifact = node.get_artifact_by_name('userdata')
+    if userdata_artifact:
+        script_path = userdata_artifact.get('script')
+        with open(script_path, 'r') as u_d:
+            userdata = u_d.read()
+
     # in case if file injection was done using dedicated node
     files = node.runtime_properties.get('injections', {})
     files.update(file_injection_artifacts)
@@ -63,6 +70,7 @@ async def create(node, inputs):
         config_drive=config_drive,
         use_existing=True if compute_id else False,
         files=files,
+        userdata=userdata,
     )
 
     networks = [port['net-id'] for port in nics]

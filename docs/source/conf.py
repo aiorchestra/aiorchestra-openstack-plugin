@@ -20,12 +20,20 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
+import sphinx
+from sphinx import errors
 
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #
-# needs_sphinx = '1.0'
+# Temporal fix for Sphinx bug (see
+# https://github.com/sphinx-doc/sphinx/issues/2436).
+needs_sphinx = '1.4.4'
+
+if needs_sphinx > sphinx.__display_version__:
+    message = 'This project needs at least Sphinx v%s' % needs_sphinx
+    raise errors.VersionRequirementError(message)
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom

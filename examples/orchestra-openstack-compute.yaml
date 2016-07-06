@@ -79,4 +79,4 @@ topology_template:
     auth_token:
       value: { get_attribute: [aiorchestra.openstack.authorization, auth_token] }
     server:
-      value: { get_attribute: [aiorchestra.openstack.compute, id] }
+      value: { get_attribute: [aiorchestra.openstack.compute, compute_id] }

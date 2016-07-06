@@ -75,7 +75,7 @@ async def create(node, inputs):
 
     networks = [port['net-id'] for port in nics]
     node.batch_update_runtime_properties(**{
-        'id': instance.id,
+        'compute_id': instance.id,
         'server': instance.__dict__,
         'status': instance.status,
         'networks': networks,
@@ -130,7 +130,7 @@ async def start(node, inputs):
     task_retry_interval = inputs.get('task_retry_interval', 10)
     nova = clients.openstack.nova(node)
     use_existing = True if node.properties.get('compute_id') else False
-    name_or_id = node.runtime_properties['server']['id']
+    name_or_id = node.runtime_properties['compute_id']
     node.context.logger.info('[{0}] - Attempting to start '
                              'compute instance.'.format(node.name))
     await instances.start(
@@ -148,7 +148,7 @@ async def delete(node, inputs):
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     use_existing = True if node.properties.get('compute_id') else False
-    name_or_id = node.runtime_properties['server']['id']
+    name_or_id = node.runtime_properties['compute_id']
     nova = clients.openstack.nova(node)
 
     await instances.delete(node.context, nova, name_or_id,
@@ -164,11 +164,13 @@ async def delete(node, inputs):
 
 @utils.operation
 async def stop(node, inputs):
+    node.context.logger.info('[{0}] - Attempting to stop compute '
+                             'instance.'.format(node.name))
     task_retries = inputs.get('task_retries', 10)
     task_retry_interval = inputs.get('task_retry_interval', 10)
     nova = clients.openstack.nova(node)
     use_existing = True if node.properties.get('compute_id') else False
-    name_or_id = node.runtime_properties['id']
+    name_or_id = node.runtime_properties['compute_id']
 
     await instances.stop(node.context, nova, name_or_id,
                          use_existing=use_existing,

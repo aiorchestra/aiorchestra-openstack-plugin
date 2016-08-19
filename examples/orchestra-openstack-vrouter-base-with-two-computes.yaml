@@ -9,7 +9,7 @@ description: vRouter base plus two computes for inbound/outbound networks
 
 imports:
 
-  - ../types.yaml
+  - https://raw.githubusercontent.com/aiorchestra/aiorchestra-openstack-plugin/v0.1.3-stable/types.yaml
 
 topology_template:
 #####################################################################
